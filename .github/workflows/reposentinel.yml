@@ -1,0 +1,77 @@
+name: RepoSentinel Regression Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - master
+
+# Least-privilege permissions: read-only access to repository contents
+permissions:
+  contents: read
+
+jobs:
+  regression-analysis:
+    name: API Contract & Regression Risk Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history so base and head revisions can be compared statically
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install TypeScript Compiler AST Parser
+        run: |
+          cd analyzer_ts
+          npm ci
+          npm run build
+
+      - name: Install RepoSentinel Engine
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Run RepoSentinel Static Analysis
+        id: run_analysis
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.sha }}
+        run: |
+          cd backend
+          python -m app.cli analyze \
+            --repo .. \
+            --base "origin/${BASE_REF}" \
+            --head "${HEAD_REF}" \
+            --format markdown \
+            --output report.md \
+            --fail-on high || echo "ANALYSIS_FAILED=true" >> $GITHUB_ENV
+
+      - name: Publish Regression Report to Job Summary
+        if: always()
+        run: |
+          if [ -f backend/report.md ]; then
+            cat backend/report.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ RepoSentinel analysis did not produce report.md" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Enforce Regression Gate
+        if: env.ANALYSIS_FAILED == 'true'
+        run: |
+          echo "::error::RepoSentinel detected high-severity breaking contract regressions. See job summary."
+          exit 1

@@ -1,0 +1,17 @@
+{
+  "name": "reposentinel-analyzer-ts",
+  "version": "1.0.0",
+  "description": "TypeScript AST extractor for RepoSentinel",
+  "type": "commonjs",
+  "main": "dist/analyze.js",
+  "scripts": {
+    "build": "tsc",
+    "analyze": "node dist/analyze.js"
+  },
+  "dependencies": {
+    "typescript": "^5.7.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1"
+  }
+}
