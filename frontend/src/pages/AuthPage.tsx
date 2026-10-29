@@ -102,7 +102,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginDemo, isLoggingIn }) 
           <div className="p-6 rounded-2xl bg-navy-900 border border-navy-800 shadow-2xl space-y-4">
             {/* Primary Demo Button */}
             <button
-              onClick={onLoginDemo}
+              onClick={async () => {
+                setErrorMsg(null);
+                try {
+                  await onLoginDemo();
+                } catch (err: any) {
+                  setErrorMsg(err.message || 'Demo login failed');
+                }
+              }}
               disabled={isLoggingIn}
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sentinel-cyan to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-navy-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/40 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
             >
