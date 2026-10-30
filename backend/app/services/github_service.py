@@ -345,6 +345,7 @@ class GitHubService:
                     raise FileNotFoundError(f"Pull request #{pr_number} not found on GitHub.")
 
                 pr_data = pr_res.json()
+                base_sha = pr_data.get("base", {}).get("sha", "")
                 files_res = await client.get(
                     f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files",
                     headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github.v3+json"},
@@ -354,17 +355,32 @@ class GitHubService:
                 parsed_files = []
                 for f in files_data:
                     raw_url = f.get("raw_url")
-                    content = ""
+                    head_content = ""
                     if raw_url:
                         raw_res = await client.get(raw_url, headers={"Authorization": f"Bearer {access_token}"})
                         if raw_res.status_code == 200:
-                            content = raw_res.text
+                            head_content = raw_res.text
+
+                    base_content = ""
+                    if base_sha and f.get("status") in ("modified", "removed"):
+                        try:
+                            base_res = await client.get(
+                                f"https://api.github.com/repos/{repo_full_name}/contents/{f['filename']}?ref={base_sha}",
+                                headers={
+                                    "Authorization": f"Bearer {access_token}",
+                                    "Accept": "application/vnd.github.v3.raw",
+                                },
+                            )
+                            if base_res.status_code == 200:
+                                base_content = base_res.text
+                        except Exception:
+                            pass
 
                     parsed_files.append({
                         "filename": f["filename"],
                         "status": f["status"],
-                        "base_content": "",
-                        "head_content": content,
+                        "base_content": base_content,
+                        "head_content": head_content,
                         "patch": f.get("patch", ""),
                     })
 
