@@ -5,5 +5,5 @@ class PaymentResponse(BaseModel):
     payment_id: int
     amount: float
     currency: str = "USD"
-    payment_token: str
+    checkout_id: str  # Breaking change: replaced payment_token with checkout_id
     status: str = "completed"
