@@ -221,6 +221,10 @@ class DatabaseManager:
                 return repo_name in ["demo-org/payment-service", "demo-org/user-service", "git_repo", "demo_project"]
             return False
 
+        # If user has a valid GitHub token connected, allow access
+        if account.get("access_token"):
+            return True
+
         repos = account.get("authorized_repos", [])
         return repo_name in repos or any(r.lower() == repo_name.lower() for r in repos)
 

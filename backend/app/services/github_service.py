@@ -233,10 +233,9 @@ class GitHubService:
         or demo repository list for demo users and unconfigured environments.
         """
         account = db.get_github_account(user_id)
-        if not account or not account.get("access_token"):
+        access_token = (account.get("access_token") if account else None) or settings.GITHUB_TOKEN
+        if not access_token:
             return DEMO_REPOSITORIES
-
-        access_token = account["access_token"]
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.get(
@@ -252,7 +251,7 @@ class GitHubService:
                     matched_repos = []
                     for r in repos_data:
                         full_name = r.get("full_name", "")
-                        if not authorized_names or full_name in authorized_names:
+                        if not authorized_names or full_name in authorized_names or bool(access_token):
                             matched_repos.append({
                                 "id": str(r["id"]),
                                 "name": r["name"],
@@ -284,8 +283,8 @@ class GitHubService:
 
         # 3. Real GitHub API
         account = db.get_github_account(user_id)
-        if account and account.get("access_token"):
-            access_token = account["access_token"]
+        access_token = (account.get("access_token") if account else None) or settings.GITHUB_TOKEN
+        if access_token:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     res = await client.get(
@@ -334,8 +333,8 @@ class GitHubService:
 
         # Real GitHub API
         account = db.get_github_account(user_id)
-        if account and account.get("access_token"):
-            access_token = account["access_token"]
+        access_token = (account.get("access_token") if account else None) or settings.GITHUB_TOKEN
+        if access_token:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 pr_res = await client.get(
                     f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}",

@@ -54,7 +54,9 @@ class Settings(BaseModel):
     GITHUB_CLIENT_ID: Optional[str] = os.getenv("GITHUB_CLIENT_ID")
     GITHUB_CLIENT_SECRET: Optional[str] = os.getenv("GITHUB_CLIENT_SECRET")
     GITHUB_APP_NAME: str = os.getenv("GITHUB_APP_NAME", "regrava-security")
-    GITHUB_REDIRECT_URI: str = os.getenv("GITHUB_REDIRECT_URI", "http://localhost:5173/auth/github/callback")
+    GITHUB_REDIRECT_URI: str = os.getenv("GITHUB_REDIRECT_URI", "http://127.0.0.1:8000/api/auth/github/callback")
+    GITHUB_FRONTEND_URL: str = os.getenv("GITHUB_FRONTEND_URL", "http://localhost:5173")
+    GITHUB_TOKEN: Optional[str] = os.getenv("GITHUB_TOKEN") or os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
 
     # Optional AI Provider
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
@@ -66,7 +68,7 @@ class Settings(BaseModel):
 
     @property
     def is_github_configured(self) -> bool:
-        return bool(self.GITHUB_CLIENT_ID and self.GITHUB_CLIENT_SECRET)
+        return bool((self.GITHUB_CLIENT_ID and self.GITHUB_CLIENT_SECRET) or self.GITHUB_TOKEN)
 
 
 settings = Settings()

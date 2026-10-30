@@ -113,6 +113,36 @@ export async function getGitHubAuthUrl(): Promise<{ url: string; is_configured: 
   );
 }
 
+export async function connectGitHubToken(token: string): Promise<{
+  status: string;
+  github_username: string;
+  authorized_repos: string[];
+  user?: UserProfile;
+}> {
+  return fetchJson<{
+    status: string;
+    github_username: string;
+    authorized_repos: string[];
+    user?: UserProfile;
+  }>(
+    `${API_BASE}/auth/github/token`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    },
+    'Failed to connect GitHub token'
+  );
+}
+
+export async function disconnectGitHub(): Promise<{ status: string }> {
+  return fetchJson<{ status: string }>(
+    `${API_BASE}/auth/github/disconnect`,
+    { method: 'POST' },
+    'Failed to disconnect GitHub'
+  );
+}
+
 export async function fetchAuthorizedRepositories(): Promise<RepositoryItem[]> {
   return fetchJson<RepositoryItem[]>(
     `${API_BASE}/repos`,

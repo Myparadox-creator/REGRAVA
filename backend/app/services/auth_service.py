@@ -1,7 +1,7 @@
 """
 Authentication and Authorization Service for REGRAVA.
-Supports Google OAuth/OIDC, GitHub App authorization, secure cookie-based session management,
-and zero-credential demo exploration.
+Supports Google OAuth/OIDC, GitHub App & OAuth authorization, GitHub Personal Access Tokens,
+secure cookie-based session management, and zero-credential demo exploration.
 """
 
 import hashlib
@@ -45,7 +45,6 @@ class AuthService:
     # --- Google OAuth Flow ---
     def get_google_auth_url(self) -> str:
         if not settings.is_google_configured:
-            # Return demo/mock instructions URL
             return "/login?error=google_not_configured"
 
         state = self.generate_oauth_state("google")
@@ -108,33 +107,40 @@ class AuthService:
             db.create_session(user["id"], session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
             return {"user": user, "session_token": session_token}
 
-    # --- GitHub App Installation & Connection Flow ---
+    # --- GitHub App & OAuth Connection Flow ---
     def get_github_auth_url(self) -> str:
         """
-        URL for installing or authorizing the REGRAVA GitHub App.
-        Requests minimum fine-grained read-only permissions on repositories.
+        Generate GitHub OAuth authorization URL with signed state.
+        Requests permissions to inspect user identity and authorized repositories.
         """
         state = self.generate_oauth_state("github")
-        if settings.is_github_configured:
+        if settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET:
             params = {
                 "client_id": settings.GITHUB_CLIENT_ID,
                 "redirect_uri": settings.GITHUB_REDIRECT_URI,
-                "scope": "read:user user:email",
+                "scope": "read:user user:email repo",
                 "state": state,
             }
             return f"https://github.com/login/oauth/authorize?{urllib.parse.urlencode(params)}"
         else:
             return f"/settings?action=github_setup&state={state}"
 
-    async def handle_github_callback(self, user_id: str, code: str, state: str, installation_id: Optional[str] = None) -> Dict[str, Any]:
+    async def handle_github_callback(
+        self, user_id: Optional[str], code: str, state: str, installation_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Exchange GitHub OAuth code for access token.
+        Supports both logging in an unauthenticated user and linking GitHub to an existing account.
+        """
         if not self.verify_oauth_state(state, "github"):
             raise HTTPException(status_code=400, detail="Invalid OAuth state parameter.")
 
-        if not settings.is_github_configured:
-            # Demo/simulated connection
+        if not (settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET):
+            # Demo/simulated connection fallback
             demo_repos = ["demo-org/payment-service", "demo-org/user-service"]
+            target_user_id = user_id or "user-demo-01"
             db.save_github_account(
-                user_id=user_id,
+                user_id=target_user_id,
                 github_user_id="gh-demo-12345",
                 github_username="demo-developer",
                 installation_id=installation_id or "inst-demo-777",
@@ -144,6 +150,8 @@ class AuthService:
                 "github_username": "demo-developer",
                 "authorized_repos": demo_repos,
                 "is_live": False,
+                "session_token": None,
+                "user": db.get_user_by_id(target_user_id),
             }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -164,7 +172,10 @@ class AuthService:
             token_data = token_res.json()
             access_token = token_data.get("access_token")
             if not access_token:
-                raise HTTPException(status_code=400, detail=f"GitHub authorization error: {token_data.get('error_description')}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"GitHub authorization error: {token_data.get('error_description')}",
+                )
 
             # Fetch user profile
             user_res = await client.get(
@@ -177,10 +188,31 @@ class AuthService:
             user_data = user_res.json() if user_res.status_code == 200 else {}
             gh_username = user_data.get("login", "unknown")
             gh_id = str(user_data.get("id", ""))
+            gh_avatar = user_data.get("avatar_url")
 
-            # Fetch repositories user has authorized for this installation or user repos
+            # Fetch user email if not public in profile
+            email = user_data.get("email")
+            if not email:
+                try:
+                    email_res = await client.get(
+                        "https://api.github.com/user/emails",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Accept": "application/vnd.github.v3+json",
+                        },
+                    )
+                    if email_res.status_code == 200:
+                        emails = email_res.json()
+                        primary = next((e["email"] for e in emails if e.get("primary")), None)
+                        email = primary or (emails[0]["email"] if emails else None)
+                except Exception:
+                    pass
+            if not email:
+                email = f"{gh_username}@users.noreply.github.com"
+
+            # Fetch real repositories accessible by this access token
             repo_res = await client.get(
-                "https://api.github.com/user/repos?per_page=100&type=owner",
+                "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator",
                 headers={
                     "Authorization": f"Bearer {access_token}",
                     "Accept": "application/vnd.github.v3+json",
@@ -191,11 +223,27 @@ class AuthService:
             if repo_res.status_code == 200:
                 authorized_repos = [r["full_name"] for r in repo_res.json() if "full_name" in r]
 
+            session_token = None
+            if not user_id:
+                # User signed in via GitHub directly from Auth screen
+                user = db.upsert_user(
+                    email=email,
+                    name=user_data.get("name") or gh_username,
+                    auth_provider="github",
+                    avatar_url=gh_avatar,
+                    is_demo=False,
+                )
+                user_id = user["id"]
+                session_token = self.generate_session_token()
+                db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
+            else:
+                user = db.get_user_by_id(user_id)
+
             db.save_github_account(
                 user_id=user_id,
                 github_user_id=gh_id,
                 github_username=gh_username,
-                installation_id=installation_id,
+                installation_id=installation_id or "oauth-app",
                 authorized_repos=authorized_repos,
                 access_token=access_token,
             )
@@ -204,7 +252,102 @@ class AuthService:
                 "github_username": gh_username,
                 "authorized_repos": authorized_repos,
                 "is_live": True,
+                "user": user,
+                "session_token": session_token,
             }
+
+    # --- Direct GitHub Personal Access Token (PAT) Connection ---
+    async def connect_github_token(self, user_id: Optional[str], token: str) -> Dict[str, Any]:
+        """
+        Connect or sign in directly using a GitHub Personal Access Token (PAT).
+        Verifies token against GitHub API, fetches user profile & all repositories,
+        and saves the GitHub account with full real-time access.
+        """
+        clean_token = token.strip()
+        if not clean_token:
+            raise HTTPException(status_code=400, detail="GitHub token cannot be empty.")
+
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            user_res = await client.get(
+                "https://api.github.com/user",
+                headers={
+                    "Authorization": f"Bearer {clean_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                },
+            )
+            if user_res.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid GitHub token. Please verify token permissions.")
+            if user_res.status_code != 200:
+                raise HTTPException(status_code=user_res.status_code, detail="Failed to verify token with GitHub API.")
+
+            user_data = user_res.json()
+            gh_username = user_data.get("login", "unknown")
+            gh_id = str(user_data.get("id", ""))
+            gh_avatar = user_data.get("avatar_url")
+
+            email = user_data.get("email")
+            if not email:
+                try:
+                    email_res = await client.get(
+                        "https://api.github.com/user/emails",
+                        headers={"Authorization": f"Bearer {clean_token}", "Accept": "application/vnd.github.v3+json"},
+                    )
+                    if email_res.status_code == 200:
+                        emails = email_res.json()
+                        primary = next((e["email"] for e in emails if e.get("primary")), None)
+                        email = primary or (emails[0]["email"] if emails else None)
+                except Exception:
+                    pass
+            if not email:
+                email = f"{gh_username}@users.noreply.github.com"
+
+            # Fetch real repositories accessible by this token
+            repo_res = await client.get(
+                "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator",
+                headers={
+                    "Authorization": f"Bearer {clean_token}",
+                    "Accept": "application/vnd.github.v3+json",
+                },
+            )
+            authorized_repos = []
+            if repo_res.status_code == 200:
+                authorized_repos = [r["full_name"] for r in repo_res.json() if "full_name" in r]
+
+            session_token = None
+            if not user_id:
+                user = db.upsert_user(
+                    email=email,
+                    name=user_data.get("name") or gh_username,
+                    auth_provider="github",
+                    avatar_url=gh_avatar,
+                    is_demo=False,
+                )
+                user_id = user["id"]
+                session_token = self.generate_session_token()
+                db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
+            else:
+                user = db.get_user_by_id(user_id)
+
+            db.save_github_account(
+                user_id=user_id,
+                github_user_id=gh_id,
+                github_username=gh_username,
+                installation_id="pat-token",
+                authorized_repos=authorized_repos,
+                access_token=clean_token,
+            )
+
+            return {
+                "github_username": gh_username,
+                "authorized_repos": authorized_repos,
+                "user": user,
+                "session_token": session_token,
+                "is_live": True,
+            }
+
+    def revoke_github_connection(self, user_id: str) -> None:
+        """Revoke linked GitHub account credentials and repository access."""
+        db.revoke_github_account(user_id)
 
     # --- Demo Login (Zero Credentials Required) ---
     def create_demo_user_session(self) -> Dict[str, Any]:
@@ -218,7 +361,8 @@ class AuthService:
             is_demo=True,
         )
 
-        # Pre-seed demo authorized repositories
+        # Pre-seed demo authorized repositories (if live GITHUB_TOKEN not configured)
+        access_token = settings.GITHUB_TOKEN or None
         demo_repos = ["demo-org/payment-service", "demo-org/user-service"]
         db.save_github_account(
             user_id=user["id"],
@@ -226,6 +370,7 @@ class AuthService:
             github_username="alex-vance-dev",
             installation_id="inst-987654",
             authorized_repos=demo_repos,
+            access_token=access_token,
         )
 
         session_token = self.generate_session_token()
@@ -238,9 +383,7 @@ auth_service = AuthService()
 
 def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]]:
     """Helper to inspect session cookie or Authorization header without raising 401."""
-    # Check session cookie
     token = request.cookies.get(settings.SESSION_COOKIE_NAME)
-    # Or check Authorization header (e.g. Bearer <token>)
     if not token and "Authorization" in request.headers:
         auth_header = request.headers["Authorization"]
         if auth_header.startswith("Bearer "):

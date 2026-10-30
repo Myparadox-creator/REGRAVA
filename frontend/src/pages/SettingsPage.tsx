@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Settings,
   Cpu,
@@ -9,6 +9,10 @@ import {
   Lock,
   ExternalLink,
   Sparkles,
+  KeyRound,
+  AlertCircle,
+  RefreshCw,
+  LogOut,
 } from 'lucide-react';
 import { UserProfile, GitHubAccount } from '../types';
 
@@ -17,6 +21,8 @@ interface SettingsPageProps {
   githubAccount: GitHubAccount | null;
   onLogout: () => void;
   onConnectGitHub: () => void;
+  onConnectToken?: (token: string) => Promise<void>;
+  onDisconnectGitHub?: () => Promise<void>;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -24,18 +30,53 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   githubAccount,
   onLogout,
   onConnectGitHub,
+  onConnectToken,
+  onDisconnectGitHub,
 }) => {
   const isGitHubConnected = !!(githubAccount && githubAccount.github_username);
+  const [tokenInput, setTokenInput] = useState('');
+  const [isConnectingToken, setIsConnectingToken] = useState(false);
+  const [tokenSuccessMsg, setTokenSuccessMsg] = useState<string | null>(null);
+  const [tokenErrorMsg, setTokenErrorMsg] = useState<string | null>(null);
+
+  const handleTokenSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tokenInput.trim() || !onConnectToken) return;
+
+    setIsConnectingToken(true);
+    setTokenErrorMsg(null);
+    setTokenSuccessMsg(null);
+
+    try {
+      await onConnectToken(tokenInput.trim());
+      setTokenSuccessMsg('GitHub token connected successfully! Your repositories are now loaded.');
+      setTokenInput('');
+    } catch (err: any) {
+      setTokenErrorMsg(err.message || 'Failed to authenticate token with GitHub.');
+    } finally {
+      setIsConnectingToken(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!onDisconnectGitHub) return;
+    try {
+      await onDisconnectGitHub();
+      setTokenSuccessMsg('GitHub account disconnected.');
+    } catch (err: any) {
+      setTokenErrorMsg(err.message || 'Failed to disconnect.');
+    }
+  };
 
   return (
     <div className="p-8 space-y-8 max-w-5xl mx-auto text-xs text-slate-300">
       <div>
         <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
           <Settings className="w-5 h-5 text-sentinel-cyan" />
-          Platform Settings & Engine Configuration
+          Platform Settings & GitHub Authentication
         </h1>
         <p className="text-xs text-slate-400 mt-1">
-          Identity, repository authorization, threat models, and static analysis constraints.
+          Identity, live GitHub repository authorization, threat models, and static analysis constraints.
         </p>
       </div>
 
@@ -76,18 +117,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           <button
             onClick={onLogout}
-            className="w-full py-2 px-3 rounded-xl bg-navy-850 hover:bg-navy-800 border border-navy-750 text-sentinel-rose text-xs font-semibold transition-colors"
+            className="w-full py-2 px-3 rounded-xl bg-navy-850 hover:bg-navy-800 border border-navy-750 text-sentinel-rose text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
           >
-            End Session & Sign Out
+            <LogOut className="w-3.5 h-3.5" />
+            <span>End Session & Sign Out</span>
           </button>
         </div>
 
-        {/* GitHub App Integration Card */}
+        {/* GitHub App & Token Authorization Card */}
         <div className="p-6 rounded-2xl bg-navy-900 border border-navy-800 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-bold text-white text-sm">
               <Github className="w-4 h-4 text-white" />
-              <span>GitHub App Authorization</span>
+              <span>GitHub Account & Repositories</span>
             </div>
             <span
               className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
@@ -96,40 +138,99 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   : 'bg-navy-800 text-slate-400'
               }`}
             >
-              {isGitHubConnected ? 'Connected' : 'Unlinked'}
+              {isGitHubConnected ? 'Live Connected' : 'Unlinked'}
             </span>
           </div>
 
-          <div className="space-y-2.5 font-mono text-[11px]">
-            <div className="flex justify-between py-1.5 border-b border-navy-800">
-              <span className="text-slate-400">GitHub User:</span>
+          <div className="space-y-2 font-mono text-[11px]">
+            <div className="flex justify-between py-1 border-b border-navy-800">
+              <span className="text-slate-400">Connected User:</span>
               <span className="text-slate-200">
                 {githubAccount?.github_username ? `@${githubAccount.github_username}` : 'None'}
               </span>
             </div>
-            <div className="flex justify-between py-1.5 border-b border-navy-800">
-              <span className="text-slate-400">Installation ID:</span>
-              <span className="text-slate-200">{githubAccount?.installation_id || 'demo-inst-01'}</span>
-            </div>
-            <div className="flex justify-between py-1.5 border-b border-navy-800">
+            <div className="flex justify-between py-1 border-b border-navy-800">
               <span className="text-slate-400">Authorized Repos:</span>
-              <span className="text-sentinel-cyan">
+              <span className="text-sentinel-cyan font-bold">
                 {githubAccount?.authorized_repos?.length || 0} repositories
               </span>
             </div>
-            <div className="flex justify-between py-1.5">
-              <span className="text-slate-400">Permission Scope:</span>
-              <span className="text-slate-300">Read-only (Pull Requests, Diffs)</span>
-            </div>
           </div>
 
-          <button
-            onClick={onConnectGitHub}
-            className="w-full py-2 px-3 rounded-xl bg-sentinel-cyan/15 hover:bg-sentinel-cyan/25 border border-sentinel-cyan/30 text-sentinel-cyan text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
-          >
-            <span>{isGitHubConnected ? 'Update GitHub App Permissions' : 'Connect GitHub App'}</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </button>
+          {/* Messages */}
+          {tokenSuccessMsg && (
+            <div className="p-2.5 rounded-lg bg-sentinel-emerald/15 border border-sentinel-emerald/30 text-sentinel-emerald text-[11px] flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span>{tokenSuccessMsg}</span>
+            </div>
+          )}
+
+          {tokenErrorMsg && (
+            <div className="p-2.5 rounded-lg bg-sentinel-rose/15 border border-sentinel-rose/30 text-sentinel-rose text-[11px] flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>{tokenErrorMsg}</span>
+            </div>
+          )}
+
+          {/* Token Connection Form */}
+          <form onSubmit={handleTokenSubmit} className="space-y-2 pt-1 border-t border-navy-800">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-sentinel-cyan" />
+                <span>Personal Access Token (PAT)</span>
+              </label>
+              <a
+                href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=REGRAVA%20Security%20Scanner"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-sentinel-cyan hover:underline flex items-center gap-1"
+              >
+                <span>Generate token on GitHub</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                className="flex-1 px-3 py-1.5 rounded-xl bg-navy-850 border border-navy-750 text-slate-200 placeholder-slate-500 font-mono text-[11px] focus:outline-none focus:border-sentinel-cyan"
+              />
+              <button
+                type="submit"
+                disabled={isConnectingToken || !tokenInput.trim()}
+                className="px-3 py-1.5 rounded-xl bg-sentinel-cyan hover:bg-cyan-400 text-navy-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 shrink-0"
+              >
+                <RefreshCw className={`w-3 h-3 ${isConnectingToken ? 'animate-spin' : ''}`} />
+                <span>{isConnectingToken ? 'Verifying...' : 'Connect Token'}</span>
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400">
+              Requires <code>repo</code> and <code>read:user</code> scopes to inspect pull requests and diffs.
+            </p>
+          </form>
+
+          {/* Action buttons */}
+          <div className="pt-2 flex items-center gap-2">
+            <button
+              onClick={onConnectGitHub}
+              className="flex-1 py-2 px-3 rounded-xl bg-navy-850 hover:bg-navy-800 border border-navy-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Github className="w-3.5 h-3.5" />
+              <span>{isGitHubConnected ? 'Re-authorize OAuth' : 'Authorize via GitHub OAuth'}</span>
+            </button>
+
+            {isGitHubConnected && onDisconnectGitHub && (
+              <button
+                onClick={handleDisconnect}
+                className="py-2 px-3 rounded-xl bg-navy-850 hover:bg-navy-800 border border-navy-700 text-sentinel-rose text-xs font-semibold transition-colors"
+              >
+                Disconnect
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -148,7 +249,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
             <div className="flex justify-between py-1 border-b border-navy-800">
               <span className="text-slate-400">AST Python Parser:</span>
-              <span className="text-slate-200">Python 3 standard <code>ast</code></span>
+              <span className="text-slate-200">Python standard <code>ast</code></span>
             </div>
             <div className="flex justify-between py-1 border-b border-navy-800">
               <span className="text-slate-400">TypeScript / React Parser:</span>

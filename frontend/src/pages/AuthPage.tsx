@@ -9,16 +9,27 @@ import {
   Layers,
   FileCode,
   AlertCircle,
+  KeyRound,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { getGoogleAuthUrl, getGitHubAuthUrl } from '../services/api';
 
 interface AuthPageProps {
   onLoginDemo: () => Promise<void>;
   isLoggingIn: boolean;
+  onConnectToken?: (token: string) => Promise<void>;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onLoginDemo, isLoggingIn }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({
+  onLoginDemo,
+  isLoggingIn,
+  onConnectToken,
+}) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showTokenForm, setShowTokenForm] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [isConnectingToken, setIsConnectingToken] = useState(false);
 
   const handleGoogleLogin = async () => {
     setErrorMsg(null);
@@ -28,7 +39,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginDemo, isLoggingIn }) 
         window.location.href = res.url;
       } else {
         setErrorMsg(
-          'Google OAuth client credentials are not configured in environment (.env). Please use the 1-Click Demo Sandbox below to test all features instantly!'
+          'Google OAuth client credentials are not configured in environment (.env). Please use the 1-Click Demo Sandbox or GitHub Token below to test all features instantly!'
         );
       }
     } catch (err: any) {
@@ -44,11 +55,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginDemo, isLoggingIn }) 
         window.location.href = res.url;
       } else {
         setErrorMsg(
-          'GitHub App credentials are not configured in environment (.env). Please use the 1-Click Demo Sandbox below to test all features instantly!'
+          'GitHub App credentials are not configured in environment (.env). You can sign in directly using a GitHub Token below, or explore the 1-Click Demo Sandbox!'
         );
+        setShowTokenForm(true);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to initialize GitHub authentication');
+    }
+  };
+
+  const handleTokenSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tokenInput.trim() || !onConnectToken) return;
+
+    setIsConnectingToken(true);
+    setErrorMsg(null);
+
+    try {
+      await onConnectToken(tokenInput.trim());
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to authenticate with GitHub token');
+    } finally {
+      setIsConnectingToken(false);
     }
   };
 
@@ -160,6 +188,67 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginDemo, isLoggingIn }) 
               <Github className="w-4 h-4 text-white" />
               <span>Continue with GitHub</span>
             </button>
+
+            {/* Direct GitHub Token (PAT) Option */}
+            <div className="pt-2 border-t border-navy-800">
+              <button
+                type="button"
+                onClick={() => setShowTokenForm(!showTokenForm)}
+                className="w-full text-center text-xs text-sentinel-cyan hover:text-cyan-300 font-medium flex items-center justify-center gap-1.5 py-1 transition-colors"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>{showTokenForm ? 'Hide Token Sign-In' : 'Or Sign In with GitHub Token (PAT)'}</span>
+              </button>
+
+              {showTokenForm && (
+                <form
+                  onSubmit={handleTokenSubmit}
+                  className="mt-3 space-y-3 p-3.5 rounded-xl bg-navy-950/70 border border-navy-750"
+                >
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-slate-300">Personal Access Token</span>
+                    <a
+                      href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=REGRAVA%20Security%20Scanner"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sentinel-cyan hover:underline flex items-center gap-1 text-[10px]"
+                    >
+                      Generate Token <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+
+                  <input
+                    type="password"
+                    value={tokenInput}
+                    onChange={(e) => setTokenInput(e.target.value)}
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    className="w-full px-3 py-2 rounded-lg bg-navy-900 border border-navy-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sentinel-cyan font-mono"
+                  />
+
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    Instantly load and scan your real public or private repositories without configuring GitHub OAuth.
+                  </p>
+
+                  <button
+                    type="submit"
+                    disabled={isConnectingToken || !tokenInput.trim()}
+                    className="w-full py-2 px-3 rounded-lg bg-sentinel-cyan hover:bg-cyan-400 text-navy-950 font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {isConnectingToken ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Verifying Token with GitHub...</span>
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>Sign In with GitHub Token</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
 
           {/* Guarantee Pills */}

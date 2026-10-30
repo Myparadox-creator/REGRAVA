@@ -27,6 +27,8 @@ import {
   runPullRequestAnalysis,
   fetchAnalysisHistory,
   updateFindingReview,
+  connectGitHubToken,
+  disconnectGitHub,
 } from './services/api';
 
 export function App() {
@@ -44,9 +46,21 @@ export function App() {
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
 
-  // Check auth status on launch
+  // Check auth status on launch and handle GitHub redirect
   useEffect(() => {
-    checkAuth();
+    const params = new URLSearchParams(window.location.search);
+    const ghAuth = params.get('github_auth');
+    if (ghAuth === 'success') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      checkAuth();
+    } else if (ghAuth === 'error') {
+      const msg = params.get('msg') || 'GitHub OAuth failed';
+      setAppError(msg);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      checkAuth();
+    } else {
+      checkAuth();
+    }
   }, []);
 
   const checkAuth = async () => {
@@ -116,6 +130,33 @@ export function App() {
     setCurrentAnalysis(null);
   };
 
+  const handleConnectGitHubToken = async (token: string) => {
+    setIsLoggingIn(true);
+    setAppError(null);
+    try {
+      const res = await connectGitHubToken(token);
+      if (res.user) {
+        setUser(res.user);
+      }
+      setIsAuthenticated(true);
+      await checkAuth();
+    } catch (err: any) {
+      setAppError(err.message || 'Failed to authenticate with GitHub token');
+      throw err;
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleDisconnectGitHub = async () => {
+    try {
+      await disconnectGitHub();
+      await checkAuth();
+    } catch (err: any) {
+      setAppError(err.message || 'Failed to disconnect GitHub');
+    }
+  };
+
   const runScan = async (owner: string, repo: string, prNumber: number) => {
     setIsLoading(true);
     setAppError(null);
@@ -175,7 +216,13 @@ export function App() {
 
   // If unauthenticated, show standalone AuthPage
   if (!isAuthenticated) {
-    return <AuthPage onLoginDemo={handleDemoLogin} isLoggingIn={isLoggingIn} />;
+    return (
+      <AuthPage
+        onLoginDemo={handleDemoLogin}
+        isLoggingIn={isLoggingIn}
+        onConnectToken={handleConnectGitHubToken}
+      />
+    );
   }
 
   const openFindingsCount =
@@ -280,6 +327,8 @@ export function App() {
               githubAccount={githubAccount}
               onLogout={handleLogout}
               onConnectGitHub={() => setCurrentTab('settings')}
+              onConnectToken={handleConnectGitHubToken}
+              onDisconnectGitHub={handleDisconnectGitHub}
             />
           )}
         </main>
