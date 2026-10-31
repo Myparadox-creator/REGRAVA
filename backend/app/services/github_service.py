@@ -345,6 +345,7 @@ class GitHubService:
 
                 pr_data = pr_res.json()
                 base_sha = pr_data.get("base", {}).get("sha", "")
+                head_sha = pr_data.get("head", {}).get("sha", "")
                 files_res = await client.get(
                     f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/files",
                     headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github.v3+json"},
@@ -353,12 +354,28 @@ class GitHubService:
 
                 parsed_files = []
                 for f in files_data:
-                    raw_url = f.get("raw_url")
                     head_content = ""
-                    if raw_url:
-                        raw_res = await client.get(raw_url, headers={"Authorization": f"Bearer {access_token}"})
-                        if raw_res.status_code == 200:
-                            head_content = raw_res.text
+                    if head_sha and f.get("status") != "removed":
+                        try:
+                            head_res = await client.get(
+                                f"https://api.github.com/repos/{repo_full_name}/contents/{f['filename']}?ref={head_sha}",
+                                headers={
+                                    "Authorization": f"Bearer {access_token}",
+                                    "Accept": "application/vnd.github.v3.raw",
+                                },
+                            )
+                            if head_res.status_code == 200:
+                                head_content = head_res.text
+                        except Exception:
+                            pass
+
+                    if not head_content and f.get("raw_url"):
+                        try:
+                            raw_res = await client.get(f["raw_url"])
+                            if raw_res.status_code == 200:
+                                head_content = raw_res.text
+                        except Exception:
+                            pass
 
                     base_content = ""
                     if base_sha and f.get("status") in ("modified", "removed"):
