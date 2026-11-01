@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ShieldAlert,
   Sparkles,
   Github,
   Lock,
@@ -83,11 +82,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   return (
     <div className="min-h-screen w-full bg-navy-950 flex flex-col justify-between text-slate-100 select-none">
       {/* Top Banner */}
-      <header className="px-8 py-5 border-b border-navy-850 flex items-center justify-between">
+      <header className="px-8 py-4 border-b border-navy-850 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-sentinel-cyan/15 border border-sentinel-cyan/30 flex items-center justify-center text-sentinel-cyan shadow-sm">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
+          <img
+            src="/regrava-icon.png"
+            alt="REGRAVA"
+            className="w-9 h-9 rounded-xl object-contain shadow-sm border border-navy-750 bg-navy-950"
+          />
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-lg tracking-tight font-sans text-white">REGRAVA</span>
@@ -95,7 +96,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 v2.0
               </span>
             </div>
-            <p className="text-xs text-slate-400">Catch what your diff could break.</p>
+            <p className="text-xs text-slate-400">Review &bull; Track &bull; Verify &bull; Merge with Confidence</p>
           </div>
         </div>
 
@@ -106,14 +107,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       </header>
 
       {/* Main Authentication Hero */}
-      <main className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md space-y-6">
-          {/* Header Title */}
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-bold text-white tracking-tight">
-              Developer Security & Regression Platform
-            </h1>
-            <p className="text-sm text-slate-400">
+      <main className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md space-y-5">
+          {/* Brand Banner Card */}
+          <div className="rounded-2xl overflow-hidden border border-navy-800 shadow-2xl bg-navy-900">
+            <img
+              src="/regrava-banner.png"
+              alt="REGRAVA - Review, Track, Verify, Merge with Confidence"
+              className="w-full h-auto object-cover"
+            />
+          </div>
+
+          {/* Header Subtitle */}
+          <div className="text-center space-y-1">
+            <p className="text-xs text-slate-400">
               Deterministic AST analysis of Pull Requests for security flaws and breaking API contracts.
             </p>
           </div>

@@ -44,7 +44,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className="w-60 bg-navy-900 border-r border-navy-800 flex flex-col justify-between shrink-0 select-none">
-      <div className="p-3 space-y-6">
+      <div className="p-3 space-y-5">
+        {/* Brand Banner Lockup */}
+        <div className="px-2 pt-1 pb-3 flex items-center gap-2.5 border-b border-navy-800">
+          <img
+            src="/regrava-icon.png"
+            alt="REGRAVA"
+            className="w-7 h-7 rounded-lg object-contain shadow-sm border border-navy-750 bg-navy-950"
+          />
+          <div className="flex flex-col">
+            <span className="font-bold text-white text-xs tracking-tight font-sans">REGRAVA</span>
+            <span className="text-[9px] text-slate-400 font-medium">Static Security Engine</span>
+          </div>
+        </div>
+
         {/* Navigation Section */}
         <div className="space-y-1">
           <div className="text-[10px] uppercase font-bold text-slate-500 px-3 py-1 tracking-wider">

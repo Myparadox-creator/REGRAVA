@@ -1,8 +1,14 @@
 <div align="center">
 
+<p align="center">
+  <img src="docs/assets/regrava-banner.png" alt="REGRAVA - Review, Track, Verify, Merge with Confidence" width="100%" style="max-width: 900px; border-radius: 14px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);" />
+</p>
+
 # 🛡️ REGRAVA
 
 ### **Catch what your diff could break.**
+*Review &bull; Track &bull; Verify &bull; Merge with Confidence*
+<br/>
 *Deterministic Pull-Request Security, Injection Vulnerability & API Contract Regression Intelligence*
 
 <br/>

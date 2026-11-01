@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ShieldAlert,
   LogOut,
   Sparkles,
   Github,
@@ -28,9 +27,11 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="h-16 bg-navy-900 border-b border-navy-800 px-6 flex items-center justify-between shrink-0 select-none">
       {/* Brand & Tagline */}
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-sentinel-cyan/15 border border-sentinel-cyan/30 flex items-center justify-center text-sentinel-cyan">
-          <ShieldAlert className="w-4 h-4" />
-        </div>
+        <img
+          src="/regrava-icon.png"
+          alt="REGRAVA"
+          className="w-8 h-8 rounded-lg object-contain shadow-sm border border-navy-750 bg-navy-950"
+        />
         <div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-white text-base tracking-tight font-sans">
@@ -47,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
           <div className="text-[11px] text-slate-400 font-medium">
-            Catch what your diff could break.
+            Review &bull; Track &bull; Verify &bull; Merge with Confidence
           </div>
         </div>
       </div>
