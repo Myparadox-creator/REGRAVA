@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { FindingDetailModal } from './components/FindingDetailModal';
 import { AuthPage } from './pages/AuthPage';
 import { OverviewPage } from './pages/OverviewPage';
+import { SecurityDashboardPage } from './pages/SecurityDashboardPage';
 import { RepositoriesPage } from './pages/RepositoriesPage';
 import { PullRequestsPage } from './pages/PullRequestsPage';
 import { FindingsPage } from './pages/FindingsPage';
@@ -17,6 +18,7 @@ import {
   PRAnalysisResult,
   Finding,
   AnalysisHistoryItem,
+  FleetSecurityPosture,
 } from './types';
 import {
   fetchAuthStatus,
@@ -29,6 +31,8 @@ import {
   updateFindingReview,
   connectGitHubToken,
   disconnectGitHub,
+  fetchSecurityPosture,
+  triggerRepositoryAudit,
 } from './services/api';
 
 export function App() {
@@ -42,6 +46,7 @@ export function App() {
   const [currentAnalysis, setCurrentAnalysis] = useState<PRAnalysisResult | null>(null);
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [securityPosture, setSecurityPosture] = useState<FleetSecurityPosture | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
@@ -80,6 +85,15 @@ export function App() {
     }
   };
 
+  const loadPostureData = async () => {
+    try {
+      const post = await fetchSecurityPosture();
+      setSecurityPosture(post);
+    } catch {
+      // Ignore background posture fetch failures
+    }
+  };
+
   const loadInitialData = async () => {
     try {
       const repos = await fetchAuthorizedRepositories();
@@ -97,6 +111,7 @@ export function App() {
       }
       const hist = await fetchAnalysisHistory();
       setHistory(hist);
+      await loadPostureData();
     } catch (err: any) {
       setAppError(err.message || 'Failed to load initial data');
     }
@@ -165,10 +180,37 @@ export function App() {
       setCurrentAnalysis(analysis);
       const updatedHistory = await fetchAnalysisHistory();
       setHistory(updatedHistory);
+      loadPostureData();
     } catch (err: any) {
       setAppError(err.message || 'Scan failed');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAuditRepo = async (owner: string, repo: string) => {
+    setIsLoading(true);
+    setAppError(null);
+    try {
+      await triggerRepositoryAudit(owner, repo);
+      await loadPostureData();
+      const hist = await fetchAnalysisHistory();
+      setHistory(hist);
+    } catch (err: any) {
+      setAppError(err.message || `Failed to audit ${owner}/${repo}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectRepoByName = async (repoFullName: string) => {
+    const target = repositories.find(
+      (r) => r.full_name.toLowerCase() === repoFullName.toLowerCase()
+    );
+    if (target) {
+      await handleSelectRepo(target);
+    } else {
+      setCurrentTab('pulls');
     }
   };
 
@@ -209,6 +251,9 @@ export function App() {
           prev ? { ...prev, review_status: status, review_notes: notes } : null
         );
       }
+
+      // Refresh posture scores
+      loadPostureData();
     } catch (err: any) {
       setAppError(err.message || 'Failed to update finding status');
     }
@@ -274,6 +319,17 @@ export function App() {
               onSelectFinding={setSelectedFinding}
               onNavigateToTab={setCurrentTab}
               onConnectGitHub={() => setCurrentTab('settings')}
+            />
+          )}
+
+          {currentTab === 'security' && (
+            <SecurityDashboardPage
+              posture={securityPosture}
+              isLoading={isLoading}
+              onRefresh={loadPostureData}
+              onAuditRepo={handleAuditRepo}
+              onSelectRepoForPRs={handleSelectRepoByName}
+              onNavigateToFindings={() => setCurrentTab('findings')}
             />
           )}
 

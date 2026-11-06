@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard,
+  ShieldCheck,
   FolderGit2,
   GitPullRequest,
   ShieldAlert,
@@ -28,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'security', label: 'Security Health', icon: ShieldCheck },
     { id: 'repos', label: 'Repositories', icon: FolderGit2 },
     { id: 'pulls', label: 'Pull Requests', icon: GitPullRequest },
     {

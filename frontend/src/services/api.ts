@@ -7,6 +7,8 @@ import {
   AnalysisHistoryItem,
   AnalysisResult,
   DemoScenario,
+  FleetSecurityPosture,
+  RepositorySecurityHealth,
 } from '../types';
 
 const API_BASE = '/api';
@@ -218,5 +220,35 @@ export async function runDemoAnalysis(scenarioId: string): Promise<AnalysisResul
     `${API_BASE}/demo/analyze/${scenarioId}`,
     { method: 'POST' },
     'Demo analysis failed'
+  );
+}
+
+export async function fetchSecurityPosture(): Promise<FleetSecurityPosture> {
+  return fetchJson<FleetSecurityPosture>(
+    `${API_BASE}/security/posture`,
+    undefined,
+    'Failed to load security posture'
+  );
+}
+
+export async function triggerRepositoryAudit(owner: string, repo: string): Promise<{
+  status: string;
+  repo_full_name: string;
+  pr_number: number;
+  health_score: number;
+  health_grade: string;
+  repo_health: RepositorySecurityHealth;
+}> {
+  return fetchJson<{
+    status: string;
+    repo_full_name: string;
+    pr_number: number;
+    health_score: number;
+    health_grade: string;
+    repo_health: RepositorySecurityHealth;
+  }>(
+    `${API_BASE}/security/audit/${owner}/${repo}`,
+    { method: 'POST' },
+    `Failed to audit repository ${owner}/${repo}`
   );
 }

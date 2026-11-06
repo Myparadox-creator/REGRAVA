@@ -169,3 +169,67 @@ export interface AnalysisResult {
   execution_time_ms: number;
   analyzed_at?: string;
 }
+
+export type HealthGrade = 'A+' | 'A' | 'B' | 'C' | 'D' | 'F';
+
+export type CheckStatus = 'passed' | 'warning' | 'failed' | 'pending';
+
+export interface SecurityCheckItem {
+  id: string;
+  layer: number;
+  name: string;
+  status: CheckStatus;
+  alerts_count: number;
+  description: string;
+  recommendation?: string;
+}
+
+export interface RepositorySecurityHealth {
+  repo_id: string;
+  repo_name: string;
+  repo_full_name: string;
+  owner: string;
+  is_private: boolean;
+  default_branch: string;
+  health_score: number;
+  health_grade: HealthGrade;
+  status: 'hardened' | 'compliant' | 'moderate_risk' | 'at_risk' | 'critical';
+  checks: SecurityCheckItem[];
+  checks_passed_count: number;
+  total_checks_count: number;
+  open_findings_count: number;
+  high_severity_count: number;
+  medium_severity_count: number;
+  low_severity_count: number;
+  breaking_contracts_count: number;
+  test_evidence_gaps_count: number;
+  total_prs_analyzed: number;
+  clean_prs_count: number;
+  flagged_prs_count: number;
+  last_scan_at: string | null;
+  last_pr_number?: number;
+  last_pr_title?: string;
+  top_risk_summary: string;
+  category_alert_counts?: Record<string, number>;
+}
+
+export interface FleetSecurityPosture {
+  average_health_score: number;
+  fleet_grade: HealthGrade;
+  total_repositories: number;
+  hardened_repositories: number;
+  at_risk_repositories: number;
+  total_security_alerts: number;
+  total_critical_high: number;
+  total_breaking_contracts: number;
+  total_test_gaps: number;
+  total_checks_passed: number;
+  total_checks_evaluated: number;
+  category_distribution: Record<string, number>;
+  compliance_readiness: {
+    soc2_ready: boolean;
+    owasp_top10_status: string;
+    unresolved_blockers: number;
+  };
+  repositories: RepositorySecurityHealth[];
+}

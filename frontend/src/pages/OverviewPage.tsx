@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ShieldAlert,
+  ShieldCheck,
   AlertTriangle,
   CheckCircle2,
   GitPullRequest,
@@ -59,11 +60,19 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => onNavigateToTab('security')}
+            className="px-3.5 py-2 rounded-xl bg-sentinel-cyan/15 hover:bg-sentinel-cyan/25 border border-sentinel-cyan/30 text-sentinel-cyan text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Security Posture</span>
+          </button>
+
           {sampleRepo && (
             <button
               onClick={() => onScanPR(sampleRepo.owner, sampleRepo.name, samplePRNumber)}
               disabled={isLoading}
-              className="px-4 py-2 rounded-xl bg-sentinel-cyan/15 hover:bg-sentinel-cyan/25 border border-sentinel-cyan/40 text-sentinel-cyan text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-navy-850 hover:bg-navy-800 border border-navy-700 text-slate-300 text-xs font-semibold flex items-center gap-2 transition-all disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               <span>{isLoading ? 'Analyzing Diff...' : 'Run Demo Scan (PR #42)'}</span>

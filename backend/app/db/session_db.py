@@ -313,6 +313,41 @@ class DatabaseManager:
                 results.append(d)
             return results
 
+    def list_full_analyses_for_user(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT id, repo_name, pr_number, pr_title, base_ref, head_ref, status, findings_json, metrics_json, summary_json, execution_time_ms, created_at "
+                "FROM pr_analyses WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+            results = []
+            for r in rows:
+                d = dict(r)
+                d["findings"] = json.loads(d["findings_json"])
+                d["metrics"] = json.loads(d["metrics_json"])
+                d["summary"] = json.loads(d["summary_json"])
+                del d["findings_json"]
+                del d["metrics_json"]
+                del d["summary_json"]
+                results.append(d)
+
+            # Merge review status for all findings
+            if results:
+                reviews = conn.execute(
+                    "SELECT analysis_id, finding_id, status, notes FROM finding_reviews"
+                ).fetchall()
+                review_map = {(r["analysis_id"], r["finding_id"]): dict(r) for r in reviews}
+                for res in results:
+                    for f in res.get("findings", []):
+                        key = (res["id"], f.get("id"))
+                        if key in review_map:
+                            f["review_status"] = review_map[key]["status"]
+                            f["review_notes"] = review_map[key].get("notes")
+                        else:
+                            f["review_status"] = "open"
+
+            return results
+
     def update_finding_review(self, analysis_id: str, finding_id: str, status: str, notes: Optional[str] = None) -> None:
         now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
