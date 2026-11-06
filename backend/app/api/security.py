@@ -29,6 +29,27 @@ async def get_security_posture(current_user: Dict[str, Any] = Depends(get_curren
         )
 
 
+@router.get("/repository/{owner}/{repo}")
+async def get_repository_security_health(
+    owner: str,
+    repo: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Retrieve in-depth security health check for a single individual repository.
+    Includes 7-layer check statuses, health score, and open findings.
+    """
+    health = await security_posture_service.get_repository_security_health(
+        current_user["id"], owner, repo
+    )
+    if not health:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Repository '{owner}/{repo}' not found or not authorized.",
+        )
+    return health
+
+
 @router.post("/audit/{owner}/{repo}")
 async def trigger_repository_audit(
     owner: str,

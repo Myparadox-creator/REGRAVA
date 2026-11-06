@@ -198,6 +198,7 @@ export interface RepositorySecurityHealth {
   checks_passed_count: number;
   total_checks_count: number;
   open_findings_count: number;
+  open_findings?: Finding[];
   high_severity_count: number;
   medium_severity_count: number;
   low_severity_count: number;

@@ -231,6 +231,17 @@ export async function fetchSecurityPosture(): Promise<FleetSecurityPosture> {
   );
 }
 
+export async function fetchRepositorySecurityHealth(
+  owner: string,
+  repo: string
+): Promise<RepositorySecurityHealth> {
+  return fetchJson<RepositorySecurityHealth>(
+    `${API_BASE}/security/repository/${owner}/${repo}`,
+    undefined,
+    `Failed to load security health for ${owner}/${repo}`
+  );
+}
+
 export async function triggerRepositoryAudit(owner: string, repo: string): Promise<{
   status: string;
   repo_full_name: string;

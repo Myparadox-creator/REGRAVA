@@ -17,6 +17,7 @@ interface RepositoriesPageProps {
   onRefresh: () => void;
   onSelectRepo: (repo: RepositoryItem) => void;
   onConnectGitHub: () => void;
+  onAnalyzeSecurity?: (repoFullName: string) => void;
 }
 
 export const RepositoriesPage: React.FC<RepositoriesPageProps> = ({
@@ -25,6 +26,7 @@ export const RepositoriesPage: React.FC<RepositoriesPageProps> = ({
   onRefresh,
   onSelectRepo,
   onConnectGitHub,
+  onAnalyzeSecurity,
 }) => {
   return (
     <div className="p-8 space-y-6 max-w-7xl mx-auto">
@@ -133,13 +135,26 @@ export const RepositoriesPage: React.FC<RepositoriesPageProps> = ({
                   </span>
                 </div>
 
-                <button
-                  onClick={() => onSelectRepo(repo)}
-                  className="px-3 py-1.5 rounded-lg bg-navy-850 hover:bg-navy-800 border border-navy-700 text-sentinel-cyan font-semibold text-xs flex items-center gap-1.5 transition-colors"
-                >
-                  <span>Inspect PRs</span>
-                  <GitPullRequest className="w-3 h-3" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {onAnalyzeSecurity && (
+                    <button
+                      onClick={() => onAnalyzeSecurity(repo.full_name)}
+                      className="px-3 py-1.5 rounded-lg bg-sentinel-cyan/15 hover:bg-sentinel-cyan/25 border border-sentinel-cyan/35 text-sentinel-cyan font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                      title="Analyze repository security posture and 7-layer health checks"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Security Health</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => onSelectRepo(repo)}
+                    className="px-3 py-1.5 rounded-lg bg-navy-850 hover:bg-navy-800 border border-navy-700 text-slate-300 hover:text-white font-semibold text-xs flex items-center gap-1.5 transition-colors"
+                  >
+                    <span>Inspect PRs</span>
+                    <GitPullRequest className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}

@@ -47,6 +47,7 @@ export function App() {
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [securityPosture, setSecurityPosture] = useState<FleetSecurityPosture | null>(null);
+  const [selectedSecurityRepo, setSelectedSecurityRepo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
@@ -225,6 +226,18 @@ export function App() {
     }
   };
 
+  const handleAnalyzeSecurityForRepo = (repoFullName: string) => {
+    setSelectedSecurityRepo(repoFullName);
+    setCurrentTab('security');
+  };
+
+  const handleTabChange = (tab: string) => {
+    if (tab === 'security' && currentTab !== 'security') {
+      setSelectedSecurityRepo(null);
+    }
+    setCurrentTab(tab);
+  };
+
   const handleUpdateFindingStatus = async (
     findingId: string,
     status: 'reviewed' | 'dismissed' | 'open',
@@ -278,7 +291,7 @@ export function App() {
       {/* Sidebar */}
       <Sidebar
         currentTab={currentTab}
-        onTabChange={setCurrentTab}
+        onTabChange={handleTabChange}
         openFindingsCount={openFindingsCount}
         githubAccount={githubAccount}
         user={user}
@@ -319,6 +332,7 @@ export function App() {
               onSelectFinding={setSelectedFinding}
               onNavigateToTab={setCurrentTab}
               onConnectGitHub={() => setCurrentTab('settings')}
+              onAnalyzeSecurity={handleAnalyzeSecurityForRepo}
             />
           )}
 
@@ -326,10 +340,13 @@ export function App() {
             <SecurityDashboardPage
               posture={securityPosture}
               isLoading={isLoading}
+              selectedRepoName={selectedSecurityRepo}
+              onSelectRepoName={setSelectedSecurityRepo}
               onRefresh={loadPostureData}
               onAuditRepo={handleAuditRepo}
               onSelectRepoForPRs={handleSelectRepoByName}
               onNavigateToFindings={() => setCurrentTab('findings')}
+              onSelectFinding={setSelectedFinding}
             />
           )}
 
@@ -340,6 +357,7 @@ export function App() {
               onRefresh={loadInitialData}
               onSelectRepo={handleSelectRepo}
               onConnectGitHub={() => setCurrentTab('settings')}
+              onAnalyzeSecurity={handleAnalyzeSecurityForRepo}
             />
           )}
 

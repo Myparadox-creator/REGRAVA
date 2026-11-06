@@ -83,3 +83,20 @@ def test_security_audit_endpoint(demo_auth_headers):
     assert data["repo_full_name"] == "demo-org/payment-service"
     assert "health_score" in data
     assert "repo_health" in data
+
+
+def test_individual_repository_security_endpoint(demo_auth_headers):
+    res = client.get(
+        "/api/security/repository/demo-org/payment-service",
+        headers=demo_auth_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+
+    assert data["repo_full_name"] == "demo-org/payment-service"
+    assert "health_score" in data
+    assert "health_grade" in data
+    assert "checks" in data
+    assert len(data["checks"]) == 7
+    assert "open_findings" in data
+

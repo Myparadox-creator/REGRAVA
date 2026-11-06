@@ -153,6 +153,17 @@ class SecurityPostureService:
             "repositories": repo_health_list,
         }
 
+    async def get_repository_security_health(
+        self, user_id: str, owner: str, repo: str
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch deep-dive security health check for an individual repository."""
+        full_name = f"{owner}/{repo}".lower()
+        posture = await self.get_fleet_security_posture(user_id)
+        for r in posture.get("repositories", []):
+            if r.get("repo_full_name", "").lower() == full_name:
+                return r
+        return None
+
     def _calculate_repo_health(
         self, repo: Dict[str, Any], analyses: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
@@ -313,6 +324,7 @@ class SecurityPostureService:
             "checks_passed_count": checks_passed,
             "total_checks_count": len(self.categories_meta),
             "open_findings_count": len(open_findings),
+            "open_findings": open_findings,
             "high_severity_count": high_count,
             "medium_severity_count": medium_count,
             "low_severity_count": low_count,

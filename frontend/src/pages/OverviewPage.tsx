@@ -26,6 +26,7 @@ interface OverviewPageProps {
   onSelectFinding: (finding: Finding) => void;
   onNavigateToTab: (tab: string) => void;
   onConnectGitHub: () => void;
+  onAnalyzeSecurity?: (repoFullName: string) => void;
 }
 
 export const OverviewPage: React.FC<OverviewPageProps> = ({
@@ -36,6 +37,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   onSelectFinding,
   onNavigateToTab,
   onConnectGitHub,
+  onAnalyzeSecurity,
 }) => {
   const highSeverityCount = latestAnalysis?.metrics?.high_severity_count || 0;
   const mediumSeverityCount = latestAnalysis?.metrics?.medium_severity_count || 0;
@@ -145,6 +147,17 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-navy-800 text-slate-400 border border-navy-750">
                       {repo.open_pull_requests_count} open PR
                     </span>
+                    <button
+                      onClick={() =>
+                        onAnalyzeSecurity
+                          ? onAnalyzeSecurity(repo.full_name)
+                          : onNavigateToTab('security')
+                      }
+                      className="p-1 rounded hover:bg-navy-750 text-slate-400 hover:text-sentinel-cyan"
+                      title="Analyze Security Health"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={() => onNavigateToTab('pulls')}
                       className="p-1 rounded hover:bg-navy-750 text-slate-400 hover:text-white"
