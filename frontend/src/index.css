@@ -79,3 +79,33 @@ body {
   background: rgba(118, 87, 255, 0.35);
   color: #FFFFFF;
 }
+
+/* Landing Page Dynamic Utilities */
+.bg-grid-pattern {
+  background-size: 36px 36px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+}
+
+.bg-radial-glow {
+  background: radial-gradient(circle at 50% 0%, rgba(118, 87, 255, 0.16) 0%, rgba(8, 9, 12, 0) 65%);
+}
+
+.glow-purple {
+  box-shadow: 0 0 40px -10px rgba(118, 87, 255, 0.35);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 30px -8px rgba(16, 185, 129, 0.3);
+}
+
+@keyframes pulseSlow {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.04); }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 6s ease-in-out infinite;
+}
+
