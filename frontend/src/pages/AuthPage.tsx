@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Github,
@@ -19,11 +19,16 @@ import {
   Copy,
   Check,
   ChevronRight,
+  ChevronDown,
   Code2,
   Users,
   BarChart3,
   GitPullRequest,
   CheckCheck,
+  Play,
+  Activity,
+  HelpCircle,
+  Sliders,
 } from 'lucide-react';
 import { getGoogleAuthUrl, getGitHubAuthUrl } from '../services/api';
 
@@ -35,6 +40,14 @@ interface AuthPageProps {
 
 type SimulatorTab = 'contract' | 'sql' | 'secrets' | 'tenancy';
 
+interface LayerState {
+  id: number;
+  name: string;
+  desc: string;
+  status: 'passed' | 'warning' | 'fixed';
+  points: number;
+}
+
 export const AuthPage: React.FC<AuthPageProps> = ({
   onLoginDemo,
   isLoggingIn,
@@ -45,12 +58,98 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [tokenInput, setTokenInput] = useState('');
   const [isConnectingToken, setIsConnectingToken] = useState(false);
 
+  // Scroll Progress & Floating Trigger State
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [showFloatingPill, setShowFloatingPill] = useState(false);
+
   // Interactive Simulator State
   const [activeTab, setActiveTab] = useState<SimulatorTab>('contract');
+  const [simulatorMode, setSimulatorMode] = useState<'diff' | 'remediation'>('diff');
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStep, setScanStep] = useState<number>(3); // 3 means scan complete
   const [copiedTest, setCopiedTest] = useState(false);
+
+  // Interactive 7-Layer Health Scorecard State
+  const [layers, setLayers] = useState<LayerState[]>([
+    { id: 1, name: 'Contract Integrity', desc: 'FastAPI schema to React TSX component mapping', status: 'warning', points: 15 },
+    { id: 2, name: 'AST Taint & SQLi', desc: 'Deterministic AST parameter interpolation check', status: 'passed', points: 15 },
+    { id: 3, name: 'High-Entropy Secrets', desc: 'Scanning for leaked payment and cloud API credentials', status: 'passed', points: 15 },
+    { id: 4, name: 'Auth & Tenancy Boundary', desc: 'Enforcing multi-tenant org_id database filters', status: 'warning', points: 15 },
+    { id: 5, name: 'Test Evidence Gaps', desc: 'Auto-generating verified Vitest/pytest assertions', status: 'passed', points: 15 },
+    { id: 6, name: 'Dependency Manifest Health', desc: 'Live CVE cross-referencing on lockfiles', status: 'passed', points: 15 },
+    { id: 7, name: 'Ephemeral Memory Sandbox', desc: '100% in-memory processing with zero retention', status: 'passed', points: 10 },
+  ]);
 
   // Interactive ROI Calculator State
   const [teamSize, setTeamSize] = useState<number>(20);
+
+  // Interactive FAQ Accordion State
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  // Scroll Progress & IntersectionObserver for Scroll Reveal
+  useEffect(() => {
+    const handleScroll = () => {
+      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (totalHeight > 0) {
+        const pct = (window.scrollY / totalHeight) * 100;
+        setScrollProgress(pct);
+      }
+      setShowFloatingPill(window.scrollY > 420);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    const elements = document.querySelectorAll('.reveal-on-scroll');
+    elements.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, [layers, activeTab]);
+
+  // Trigger live interactive scan simulation
+  const handleRunLiveScan = () => {
+    setIsScanning(true);
+    setScanStep(0);
+
+    setTimeout(() => setScanStep(1), 350);
+    setTimeout(() => setScanStep(2), 700);
+    setTimeout(() => {
+      setScanStep(3);
+      setIsScanning(false);
+    }, 1100);
+  };
+
+  // Toggle fixing a layer to watch the score climb dynamically
+  const handleToggleLayerFix = (id: number) => {
+    setLayers((prev) =>
+      prev.map((layer) => {
+        if (layer.id === id) {
+          return {
+            ...layer,
+            status: layer.status === 'warning' ? 'fixed' : 'warning',
+          };
+        }
+        return layer;
+      })
+    );
+  };
+
+  const calculatedHealthScore = layers.reduce((acc, l) => {
+    return l.status === 'passed' || l.status === 'fixed' ? acc + l.points : acc;
+  }, 0);
 
   const handleGoogleLogin = async () => {
     setErrorMsg(null);
@@ -130,8 +229,59 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const dollarsSavedPerMonth = Math.round(hoursSavedPerMonth * 75);
   const outagesPreventedPerYear = Math.max(1, Math.round(teamSize * 0.25));
 
+  // Frameworks Marquee List
+  const frameworks = [
+    'FastAPI',
+    'Next.js 15',
+    'React 19',
+    'TypeScript 5.7',
+    'Python 3.12',
+    'Pydantic v2',
+    'Go 1.23',
+    'Vitest',
+    'Pytest',
+    'GitHub Actions',
+    'Node.js',
+    'PostgreSQL',
+    'GraphQL',
+    'Docker',
+    'Turborepo',
+  ];
+
   return (
     <div className="min-h-screen w-full bg-[#08090C] text-[#D1D5DC] font-sans antialiased selection:bg-[#7657FF]/30 selection:text-white relative overflow-x-hidden">
+      {/* Top Scroll Depth Progress Bar */}
+      <div
+        className="fixed top-0 left-0 h-[2.5px] bg-gradient-to-r from-[#7657FF] via-[#A78BFA] to-[#10B981] z-50 transition-all duration-75"
+        style={{ width: `${scrollProgress}%` }}
+      />
+
+      {/* Floating Bottom Quick-Action Pill (appears on scroll) */}
+      <aside
+        aria-label="Quick Actions"
+        className={`fixed bottom-6 right-6 z-40 transition-all duration-500 ease-out ${
+          showFloatingPill ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95 pointer-events-none'
+        }`}
+      >
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[#111318]/90 backdrop-blur-xl border border-[#48366F] shadow-2xl shadow-purple-950/60 glow-purple">
+          <button
+            onClick={onLoginDemo}
+            disabled={isLoggingIn}
+            className="px-4 py-2 rounded-xl bg-[#7657FF] hover:bg-[#896EFF] text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-white" />
+            <span>{isLoggingIn ? 'Spinning...' : 'Launch 1-Click Sandbox'}</span>
+          </button>
+          <button
+            onClick={scrollToAuth}
+            className="p-2 rounded-xl text-[#9299A5] hover:text-[#F5F6F8] hover:bg-[#15181F] transition-colors"
+            title="Sign In with GitHub"
+          >
+            <Github className="w-4 h-4" />
+          </button>
+        </div>
+      </aside>
+
       {/* Background ambient lighting */}
       <div className="fixed inset-0 pointer-events-none bg-radial-glow z-0" />
       <div className="fixed inset-0 pointer-events-none bg-grid-pattern opacity-60 z-0" />
@@ -140,11 +290,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0D11]/85 border-b border-[#1C2028] px-6 lg:px-12 py-3.5 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           {/* Logo & Brand */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+          <div
+            className="flex items-center gap-3 cursor-pointer group"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
             <img
               src="/regrava-icon.png"
               alt="REGRAVA"
-              className="w-8 h-8 rounded-lg object-contain border border-[#252932] bg-[#08090C] shadow-md shadow-purple-950/20"
+              className="w-8 h-8 rounded-lg object-contain border border-[#252932] bg-[#08090C] shadow-md shadow-purple-950/20 group-hover:border-[#7657FF] transition-all"
             />
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-base tracking-tight text-[#F5F6F8]">REGRAVA</span>
@@ -160,7 +313,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
           {/* Center Links */}
           <nav className="hidden lg:flex items-center gap-7 text-xs font-medium text-[#9299A5]">
-            <a href="#simulator" className="hover:text-[#F5F6F8] transition-colors">
+            <a href="#live-simulator" className="hover:text-[#F5F6F8] transition-colors">
               Interactive Simulator
             </a>
             <a href="#wedge" className="hover:text-[#F5F6F8] transition-colors">
@@ -174,6 +327,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </a>
             <a href="#roi" className="hover:text-[#F5F6F8] transition-colors">
               ROI Calculator
+            </a>
+            <a href="#faq" className="hover:text-[#F5F6F8] transition-colors">
+              FAQ
             </a>
           </nav>
 
@@ -198,13 +354,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       </header>
 
       {/* Main Landing Page Content */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 pt-12 pb-24 space-y-28">
+      <main className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 pt-12 pb-24 space-y-32">
         {/* ========================================================================= */}
         {/* 1. HERO SECTION */}
         {/* ========================================================================= */}
-        <section className="text-center pt-6 pb-4 max-w-4xl mx-auto space-y-7">
+        <section className="text-center pt-6 pb-4 max-w-4xl mx-auto space-y-8 reveal-on-scroll is-visible">
           {/* Announcement Beacon */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111318] border border-[#252932] shadow-inner text-xs font-medium text-[#D1D5DC]">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111318] border border-[#252932] shadow-inner text-xs font-medium text-[#D1D5DC] hover:border-[#48366F] transition-all">
             <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#7657FF] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#7657FF]"></span>
@@ -225,7 +381,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-[#9299A5] max-w-2xl mx-auto leading-relaxed">
-            Generic AI reviewers flood PRs with noisy style comments. REGRAVA maps your backend schemas to frontend UI components, flags contract breaks in <span className="text-[#F5F6F8] font-medium">&lt; 45ms</span>, and auto-generates verified test proofs with <span className="text-[#10B981] font-medium">zero cloud retention</span>.
+            Generic AI reviewers flood PRs with noisy style comments. REGRAVA maps your backend schemas to frontend UI components, flags contract breaks in <span className="text-[#F5F6F8] font-semibold">&lt; 45ms</span>, and auto-generates verified test proofs with <span className="text-[#10B981] font-semibold">zero cloud retention</span>.
           </p>
 
           {/* Hero CTAs */}
@@ -250,28 +406,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
             <button
               onClick={scrollToSimulator}
-              className="w-full sm:w-auto px-5 py-3.5 rounded-xl text-xs font-semibold text-[#9299A5] hover:text-[#F5F6F8] transition-colors flex items-center justify-center gap-1.5"
+              className="w-full sm:w-auto px-5 py-3.5 rounded-xl text-xs font-semibold text-[#9299A5] hover:text-[#F5F6F8] hover:bg-[#111318] border border-transparent hover:border-[#252932] transition-all flex items-center justify-center gap-1.5"
             >
               <Terminal className="w-4 h-4 text-[#896EFF]" />
-              <span>See Live Diff Simulator</span>
+              <span>Live Diff Simulator ↓</span>
             </button>
           </div>
 
           {/* Fast Spec Counters */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-8 max-w-3xl mx-auto text-left">
-            <div className="p-4 rounded-xl bg-[#111318]/70 border border-[#1C2028] backdrop-blur-sm">
+            <div className="p-4 rounded-xl bg-[#111318]/80 border border-[#1C2028] hover:border-[#252932] transition-all">
               <div className="text-2xl font-extrabold text-[#F5F6F8]">&lt; 45ms</div>
               <div className="text-xs text-[#707783] mt-0.5">AST Analysis Speed</div>
             </div>
-            <div className="p-4 rounded-xl bg-[#111318]/70 border border-[#1C2028] backdrop-blur-sm">
+            <div className="p-4 rounded-xl bg-[#111318]/80 border border-[#1C2028] hover:border-[#10B981]/40 transition-all">
               <div className="text-2xl font-extrabold text-[#10B981]">0%</div>
               <div className="text-xs text-[#707783] mt-0.5">Hallucination Rate</div>
             </div>
-            <div className="p-4 rounded-xl bg-[#111318]/70 border border-[#1C2028] backdrop-blur-sm">
+            <div className="p-4 rounded-xl bg-[#111318]/80 border border-[#1C2028] hover:border-[#896EFF]/40 transition-all">
               <div className="text-2xl font-extrabold text-[#896EFF]">100%</div>
-              <div className="text-xs text-[#707783] mt-0.5">In-Memory / Zero Cloud Retention</div>
+              <div className="text-xs text-[#707783] mt-0.5">In-Memory Zero Retention</div>
             </div>
-            <div className="p-4 rounded-xl bg-[#111318]/70 border border-[#1C2028] backdrop-blur-sm">
+            <div className="p-4 rounded-xl bg-[#111318]/80 border border-[#1C2028] hover:border-[#252932] transition-all">
               <div className="text-2xl font-extrabold text-[#F5F6F8]">7-Layer</div>
               <div className="text-xs text-[#707783] mt-0.5">Fleet Security Radar</div>
             </div>
@@ -279,146 +435,265 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 2. INTERACTIVE PR SIMULATOR (The "Show, Don't Tell" Centerpiece) */}
+        {/* INFINITE FRAMEWORKS MARQUEE */}
         {/* ========================================================================= */}
-        <section id="live-simulator" className="space-y-6 scroll-mt-24">
+        <section aria-label="Supported Technologies" className="overflow-hidden py-4 border-y border-[#1C2028] bg-[#0B0D11]/50 reveal-on-scroll">
+          <div className="flex items-center gap-4 text-xs font-medium text-[#707783]">
+            <span className="shrink-0 font-bold uppercase tracking-widest text-[#896EFF] text-[10px] pl-4">
+              Supported Ecosystem:
+            </span>
+            <div className="overflow-hidden w-full">
+              <div className="animate-marquee flex items-center gap-8 text-[#9299A5]">
+                {frameworks.concat(frameworks).map((tech, idx) => (
+                  <span
+                    key={idx}
+                    className="flex items-center gap-2 hover:text-[#F5F6F8] transition-colors cursor-default whitespace-nowrap"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#48366F]" />
+                    {tech}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 2. INTERACTIVE PR SIMULATOR (Live Clickable Scenarios + Live Scan) */}
+        {/* ========================================================================= */}
+        <section id="live-simulator" className="space-y-6 scroll-mt-24 reveal-on-scroll">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
               <Terminal className="w-3.5 h-3.5" />
               <span>Interactive Verification Simulator</span>
             </div>
             <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
-              See What Generic AI Misses in Real PRs
+              Test Real PR Regressions in the Browser
             </h2>
             <p className="text-xs sm:text-sm text-[#9299A5]">
-              Click the scenarios below to see how stochastic AI reviewers approve broken code, while REGRAVA's deterministic AST catches the exact breaking consumer in milliseconds.
+              Click the scenarios, toggle between breaking diffs and auto-remediations, or click <strong>Run Live Scan</strong> to experience sub-45ms deterministic AST traversal.
             </p>
           </div>
 
           {/* Simulator Box */}
           <div className="rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl overflow-hidden glow-purple">
-            {/* Top Bar with Tabs */}
-            <div className="bg-[#0B0D11] border-b border-[#252932] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+            {/* Top Bar with Tabs and Live Run Scan Button */}
+            <div className="bg-[#0B0D11] border-b border-[#252932] px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
                 <div className="flex gap-1.5">
                   <div className="w-3 h-3 rounded-full bg-[#F04452]/80" />
                   <div className="w-3 h-3 rounded-full bg-[#F59E0B]/80" />
                   <div className="w-3 h-3 rounded-full bg-[#10B981]/80" />
                 </div>
-                <span className="text-xs font-mono text-[#707783] ml-2">PR #42 &bull; Myparadox-creator/REGRAVA</span>
+                <span className="text-xs font-mono text-[#9299A5]">
+                  PR #42 &bull; Myparadox-creator/REGRAVA
+                </span>
               </div>
 
-              {/* Scenario Tabs */}
-              <div className="flex items-center gap-1.5 bg-[#15181F] p-1 rounded-xl border border-[#252932]">
+              {/* Action Controls & Simulator Tabs */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Mode Toggle: Diff vs Remediation */}
+                <div className="flex items-center bg-[#15181F] p-0.5 rounded-lg border border-[#252932] text-xs">
+                  <button
+                    onClick={() => setSimulatorMode('diff')}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                      simulatorMode === 'diff'
+                        ? 'bg-[#252932] text-[#F5F6F8]'
+                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
+                    }`}
+                  >
+                    Breaking Diff
+                  </button>
+                  <button
+                    onClick={() => setSimulatorMode('remediation')}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                      simulatorMode === 'remediation'
+                        ? 'bg-[#10B981]/20 text-[#10B981] font-semibold'
+                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
+                    }`}
+                  >
+                    Auto-Fix Patch
+                  </button>
+                </div>
+
+                {/* Scenario Tabs */}
+                <div className="flex items-center gap-1 bg-[#15181F] p-0.5 rounded-lg border border-[#252932] text-xs">
+                  <button
+                    onClick={() => {
+                      setActiveTab('contract');
+                      handleRunLiveScan();
+                    }}
+                    className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
+                      activeTab === 'contract'
+                        ? 'bg-[#7657FF] text-white shadow-sm'
+                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
+                    }`}
+                  >
+                    Contract Diff
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('sql');
+                      handleRunLiveScan();
+                    }}
+                    className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
+                      activeTab === 'sql'
+                        ? 'bg-[#7657FF] text-white shadow-sm'
+                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
+                    }`}
+                  >
+                    SQLi Taint
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('secrets');
+                      handleRunLiveScan();
+                    }}
+                    className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
+                      activeTab === 'secrets'
+                        ? 'bg-[#7657FF] text-white shadow-sm'
+                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
+                    }`}
+                  >
+                    Leaked Secret
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('tenancy');
+                      handleRunLiveScan();
+                    }}
+                    className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
+                      activeTab === 'tenancy'
+                        ? 'bg-[#7657FF] text-white shadow-sm'
+                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
+                    }`}
+                  >
+                    Auth Tenancy
+                  </button>
+                </div>
+
+                {/* Live Scan Trigger Button */}
                 <button
-                  onClick={() => setActiveTab('contract')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'contract'
-                      ? 'bg-[#7657FF] text-white shadow-sm'
-                      : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                  }`}
+                  onClick={handleRunLiveScan}
+                  disabled={isScanning}
+                  className="px-3 py-1 rounded-lg bg-[#211A35] hover:bg-[#2e244d] border border-[#48366F] text-[#896EFF] text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  Breaking Contract Diff
-                </button>
-                <button
-                  onClick={() => setActiveTab('sql')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'sql'
-                      ? 'bg-[#7657FF] text-white shadow-sm'
-                      : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                  }`}
-                >
-                  AST SQL Injection
-                </button>
-                <button
-                  onClick={() => setActiveTab('secrets')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'secrets'
-                      ? 'bg-[#7657FF] text-white shadow-sm'
-                      : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                  }`}
-                >
-                  Leaked Secret
-                </button>
-                <button
-                  onClick={() => setActiveTab('tenancy')}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                    activeTab === 'tenancy'
-                      ? 'bg-[#7657FF] text-white shadow-sm'
-                      : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                  }`}
-                >
-                  Auth Tenancy Leak
+                  {isScanning ? (
+                    <RefreshCw className="w-3 h-3 animate-spin text-[#896EFF]" />
+                  ) : (
+                    <Play className="w-3 h-3 text-[#896EFF] fill-current" />
+                  )}
+                  <span>{isScanning ? 'Analyzing AST...' : 'Run Live Scan'}</span>
                 </button>
               </div>
             </div>
 
+            {/* Scanning Progress Bar if scanning */}
+            {isScanning && (
+              <div className="bg-[#08090C] px-5 py-2 border-b border-[#252932] text-xs font-mono text-[#896EFF] flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 animate-pulse text-[#10B981]" />
+                  {scanStep === 0 && 'Phase 1: Generating Abstract Syntax Tree for app/schemas/user.py...'}
+                  {scanStep === 1 && 'Phase 2: Traversing 14 frontend TSX consumer components...'}
+                  {scanStep === 2 && 'Phase 3: Cross-boundary taint and interface verification...'}
+                  {scanStep === 3 && 'Scan Complete: 1 Critical Contract Break Found!'}
+                </span>
+                <span className="text-[10px] text-[#707783]">{scanStep * 33}%</span>
+              </div>
+            )}
+
             {/* Scenario Content Pane */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#252932] min-h-[380px]">
-              {/* Left Column: The PR Diff */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#252932] min-h-[420px]">
+              {/* Left Column: The PR Diff or Auto-Fix Patch */}
               <div className="lg:col-span-5 p-5 space-y-3 font-mono text-xs bg-[#08090C]">
                 <div className="flex items-center justify-between text-[#707783] border-b border-[#1C2028] pb-2">
                   <span className="flex items-center gap-1.5 text-xs text-[#D1D5DC]">
                     <GitPullRequest className="w-3.5 h-3.5 text-[#896EFF]" />
-                    {activeTab === 'contract' && 'app/schemas/user.py'}
-                    {activeTab === 'sql' && 'app/db/repositories.py'}
-                    {activeTab === 'secrets' && 'config/payment_gateway.py'}
-                    {activeTab === 'tenancy' && 'app/routers/invoices.py'}
+                    {simulatorMode === 'diff' ? (
+                      activeTab === 'contract'
+                        ? 'app/schemas/user.py'
+                        : activeTab === 'sql'
+                        ? 'app/db/repositories.py'
+                        : activeTab === 'secrets'
+                        ? 'config/payment_gateway.py'
+                        : 'app/routers/invoices.py'
+                    ) : (
+                      'frontend/src/components/UserProfile.tsx'
+                    )}
                   </span>
-                  <span className="text-[11px] text-[#707783]">+12 -3 lines</span>
+                  <span className="text-[11px] text-[#707783]">
+                    {simulatorMode === 'diff' ? '+12 -3 lines' : 'Auto-Remediated Fix'}
+                  </span>
                 </div>
 
-                {activeTab === 'contract' && (
+                {simulatorMode === 'diff' ? (
+                  <>
+                    {activeTab === 'contract' && (
+                      <div className="space-y-1 leading-relaxed text-[#9299A5]">
+                        <div className="text-[#707783]">@@ -18,6 +18,6 @@ class UserResponse(BaseModel):</div>
+                        <div className="text-[#D1D5DC]">     username: str</div>
+                        <div className="text-[#D1D5DC]">     email: EmailStr</div>
+                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
+                          -    user_id: int # Old primary key
+                        </div>
+                        <div className="bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded">
+                          +    id: int      # Renamed for OpenAPI consistency
+                        </div>
+                        <div className="text-[#D1D5DC]">     is_active: bool = True</div>
+                      </div>
+                    )}
+
+                    {activeTab === 'sql' && (
+                      <div className="space-y-1 leading-relaxed text-[#9299A5]">
+                        <div className="text-[#707783]">@@ -45,4 +45,4 @@ async def get_orders(client_query: str):</div>
+                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
+                          -    return await db.execute(select(Order).where(Order.id == order_id))
+                        </div>
+                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
+                          +    # Direct query string interpolation
+                        </div>
+                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
+                          {'+    raw_sql = f"SELECT * FROM orders WHERE status = \'{client_query}\'""'}
+                        </div>
+                        <div className="bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded">
+                          +    return await db.fetch_all(raw_sql)
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === 'secrets' && (
+                      <div className="space-y-1 leading-relaxed text-[#9299A5]">
+                        <div className="text-[#707783]">@@ -8,3 +8,4 @@ class StripeConfig:</div>
+                        <div className="text-[#D1D5DC]">     API_VERSION = "2024-06-20"</div>
+                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
+                          +    TEST_WEBHOOK_SECRET = "demo_key_synthetic_high_entropy_token_xyz"
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === 'tenancy' && (
+                      <div className="space-y-1 leading-relaxed text-[#9299A5]">
+                        <div className="text-[#707783]">@@ -30,4 +30,4 @@ async def get_invoice(invoice_id: str):</div>
+                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
+                          -    # Checked current_user.tenant_id
+                        </div>
+                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
+                          {'+    return await db.invoices.find_one({"_id": invoice_id})'}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
                   <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                    <div className="text-[#707783]">@@ -18,6 +18,6 @@ class UserResponse(BaseModel):</div>
-                    <div className="text-[#D1D5DC]">     username: str</div>
-                    <div className="text-[#D1D5DC]">     email: EmailStr</div>
+                    <div className="text-[#707783]">@@ -32,4 +32,4 @@ export function UserProfile({`{ data }`}: Props):</div>
                     <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                      -    user_id: int # Old primary key
+                      -  &lt;div className="id-badge"&gt;ID: {`{data.user_id}`}&lt;/div&gt;
                     </div>
                     <div className="bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded">
-                      +    id: int      # Renamed for OpenAPI consistency
+                      +  &lt;div className="id-badge"&gt;ID: {`{data.id}`}&lt;/div&gt; // Auto-synced with schema
                     </div>
-                    <div className="text-[#D1D5DC]">     is_active: bool = True</div>
-                  </div>
-                )}
-
-                {activeTab === 'sql' && (
-                  <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                    <div className="text-[#707783]">@@ -45,4 +45,4 @@ async def get_orders(client_query: str):</div>
-                    <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                      -    return await db.execute(select(Order).where(Order.id == order_id))
-                    </div>
-                    <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                      +    # Direct query string interpolation
-                    </div>
-                    <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                      {'+    raw_sql = f"SELECT * FROM orders WHERE status = \'{client_query}\'""'}
-                    </div>
-                    <div className="bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded">
-                      +    return await db.fetch_all(raw_sql)
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'secrets' && (
-                  <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                    <div className="text-[#707783]">@@ -8,3 +8,4 @@ class StripeConfig:</div>
-                    <div className="text-[#D1D5DC]">     API_VERSION = "2024-06-20"</div>
-                    <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                      +    TEST_WEBHOOK_SECRET = "demo_key_synthetic_high_entropy_token_xyz"
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'tenancy' && (
-                  <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                    <div className="text-[#707783]">@@ -30,4 +30,4 @@ async def get_invoice(invoice_id: str):</div>
-                    <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                      -    # Checked current_user.tenant_id
-                    </div>
-                    <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                      {'+    return await db.invoices.find_one({"_id": invoice_id})'}
+                    <div className="text-[#10B981] pt-3 text-[11px]">
+                      ✨ 1-Click Patch Generated: Safely resolves contract without broken UI!
                     </div>
                   </div>
                 )}
@@ -551,7 +826,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         {/* ========================================================================= */}
         {/* 3. THE WEDGE & ARCHITECTURAL MOAT */}
         {/* ========================================================================= */}
-        <section id="wedge" className="space-y-10 scroll-mt-24">
+        <section id="wedge" className="space-y-10 scroll-mt-24 reveal-on-scroll">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
               <Zap className="w-3.5 h-3.5" />
@@ -566,7 +841,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all">
+            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all hover:scale-[1.01]">
               <div className="w-10 h-10 rounded-xl bg-[#211A35] border border-[#48366F] flex items-center justify-center text-[#896EFF]">
                 <Cpu className="w-5 h-5" />
               </div>
@@ -576,7 +851,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all">
+            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all hover:scale-[1.01]">
               <div className="w-10 h-10 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 flex items-center justify-center text-[#10B981]">
                 <Lock className="w-5 h-5" />
               </div>
@@ -586,7 +861,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all">
+            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all hover:scale-[1.01]">
               <div className="w-10 h-10 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 flex items-center justify-center text-[#F59E0B]">
                 <Code2 className="w-5 h-5" />
               </div>
@@ -599,91 +874,113 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 4. THE 7-LAYER FLEET SECURITY POSTURE */}
+        {/* 4. THE 7-LAYER FLEET SECURITY POSTURE (Interactive Scorecard) */}
         {/* ========================================================================= */}
-        <section id="seven-pillars" className="space-y-10 scroll-mt-24">
+        <section id="seven-pillars" className="space-y-10 scroll-mt-24 reveal-on-scroll">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
               <Layers className="w-3.5 h-3.5" />
               <span>Full-Stack Security Radar</span>
             </div>
             <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
-              7-Layer Deterministic Fleet Protection
+              7-Layer Deterministic Fleet Scorecard
             </h2>
             <p className="text-xs sm:text-sm text-[#9299A5]">
-              Every pull request and repository is evaluated against seven critical software integrity layers with mathematical certainty.
+              Click on the warning layers below to simulate automated auto-remediation and watch the live Fleet Health Score climb to 100%!
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl bg-[#111318] border border-[#252932] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#F5F6F8]">1. Contract Integrity</span>
-                <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            {/* Left: Dynamic Live Health Gauge */}
+            <div className="lg:col-span-4 p-7 rounded-2xl bg-[#111318] border border-[#252932] text-center space-y-4 shadow-xl">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#9299A5]">
+                Simulated Fleet Posture
               </div>
-              <p className="text-[11px] text-[#707783] leading-relaxed">
-                Traces backend schema modifications directly to frontend TSX consumer components across repos.
+              <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    className="stroke-[#252932]"
+                    strokeWidth="8"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke={calculatedHealthScore >= 85 ? '#10B981' : '#F59E0B'}
+                    strokeWidth="8"
+                    strokeDasharray={251.2}
+                    strokeDashoffset={251.2 - (251.2 * calculatedHealthScore) / 100}
+                    strokeLinecap="round"
+                    fill="transparent"
+                    className="transition-all duration-700 ease-out"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-extrabold text-[#F5F6F8]">
+                    {calculatedHealthScore}%
+                  </span>
+                  <span className="text-[10px] text-[#707783] uppercase tracking-wide">
+                    {calculatedHealthScore >= 85 ? 'Healthy' : 'Needs Fix'}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-[#9299A5]">
+                {calculatedHealthScore === 100
+                  ? '✨ All 7 Deterministic Layers Verified! Ready for production deployment.'
+                  : '⚠️ 2 potential contract and tenancy regressions detected in active PR branches.'}
               </p>
+              <button
+                onClick={() => {
+                  setLayers((prev) =>
+                    prev.map((l) => ({ ...l, status: 'passed' }))
+                  );
+                }}
+                className="w-full py-2 px-3 rounded-lg bg-[#211A35] hover:bg-[#2e244d] border border-[#48366F] text-xs font-semibold text-[#896EFF] transition-colors"
+              >
+                Auto-Fix All 7 Layers
+              </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-[#111318] border border-[#252932] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#F5F6F8]">2. AST Taint & SQLi</span>
-                <span className="w-2 h-2 rounded-full bg-[#896EFF]" />
-              </div>
-              <p className="text-[11px] text-[#707783] leading-relaxed">
-                Deterministic taint-tracking through syntax trees to catch unescaped query interpolations.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#111318] border border-[#252932] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#F5F6F8]">3. High-Entropy Secrets</span>
-                <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
-              </div>
-              <p className="text-[11px] text-[#707783] leading-relaxed">
-                Detects leaked Stripe, AWS, and private keys before they get committed to Git history.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#111318] border border-[#252932] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#F5F6F8]">4. Auth & Tenancy</span>
-                <span className="w-2 h-2 rounded-full bg-[#896EFF]" />
-              </div>
-              <p className="text-[11px] text-[#707783] leading-relaxed">
-                Flags database queries that omit critical tenant or user boundary filters in API routes.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#111318] border border-[#252932] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#F5F6F8]">5. Test Evidence Gaps</span>
-                <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-              </div>
-              <p className="text-[11px] text-[#707783] leading-relaxed">
-                Auto-generates verified pytest and Vitest assertions for all modified API contracts.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#111318] border border-[#252932] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#F5F6F8]">6. Dependency Health</span>
-                <span className="w-2 h-2 rounded-full bg-[#896EFF]" />
-              </div>
-              <p className="text-[11px] text-[#707783] leading-relaxed">
-                Scans package manifests against active CVE databases for zero-day vulnerable dependencies.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#111318] border border-[#252932] space-y-2 sm:col-span-2 lg:col-span-1 xl:col-span-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#F5F6F8]">7. Ephemeral Sandbox Execution</span>
-                <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-              </div>
-              <p className="text-[11px] text-[#707783] leading-relaxed">
-                100% in-memory processing. Zero disk persistence, zero cloud training, compliant with SOC2/HIPAA mandates.
-              </p>
+            {/* Right: The 7 Clickable Layer Cards */}
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {layers.map((layer) => (
+                <div
+                  key={layer.id}
+                  onClick={() => handleToggleLayerFix(layer.id)}
+                  className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                    layer.status === 'passed' || layer.status === 'fixed'
+                      ? 'bg-[#111318] border-[#252932] hover:border-[#10B981]/50'
+                      : 'bg-[#15181F] border-[#F59E0B]/50 hover:border-[#F59E0B]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#F5F6F8] flex items-center gap-1.5">
+                      {layer.status === 'passed' || layer.status === 'fixed' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-[#F59E0B]" />
+                      )}
+                      <span>{layer.name}</span>
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded ${
+                        layer.status === 'passed' || layer.status === 'fixed'
+                          ? 'bg-[#10B981]/15 text-[#10B981]'
+                          : 'bg-[#F59E0B]/15 text-[#F59E0B]'
+                      }`}
+                    >
+                      {layer.status === 'passed' ? 'Clean' : layer.status === 'fixed' ? 'Fixed ✓' : 'Action Req'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#707783] mt-1.5 leading-relaxed">
+                    {layer.desc}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -691,7 +988,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         {/* ========================================================================= */}
         {/* 5. COMPETITIVE COMPARISON MATRIX */}
         {/* ========================================================================= */}
-        <section id="comparison" className="space-y-8 scroll-mt-24">
+        <section id="comparison" className="space-y-8 scroll-mt-24 reveal-on-scroll">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
               <BarChart3 className="w-3.5 h-3.5" />
@@ -705,56 +1002,56 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </p>
           </div>
 
-          <div className="rounded-2xl bg-[#111318] border border-[#252932] overflow-x-auto">
+          <div className="rounded-2xl bg-[#111318] border border-[#252932] overflow-x-auto shadow-2xl">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#0B0D11] border-b border-[#252932] text-[#F5F6F8]">
                 <tr>
-                  <th className="py-3.5 px-4 font-semibold">Capability</th>
-                  <th className="py-3.5 px-4 font-bold text-[#896EFF]">REGRAVA (Deterministic Sentinel)</th>
-                  <th className="py-3.5 px-4 font-semibold text-[#9299A5]">CodeRabbit / Copilot</th>
-                  <th className="py-3.5 px-4 font-semibold text-[#9299A5]">Traditional SAST (SonarQube)</th>
+                  <th className="py-4 px-5 font-semibold">Capability</th>
+                  <th className="py-4 px-5 font-bold text-[#896EFF] bg-[#211A35]/30">REGRAVA (Deterministic Sentinel)</th>
+                  <th className="py-4 px-5 font-semibold text-[#9299A5]">CodeRabbit / Copilot</th>
+                  <th className="py-4 px-5 font-semibold text-[#9299A5]">Traditional SAST (SonarQube)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1C2028]">
                 <tr>
-                  <td className="py-3 px-4 font-medium text-[#F5F6F8]">Cross-Boundary Contract Tracing</td>
-                  <td className="py-3 px-4 text-[#10B981] font-bold flex items-center gap-1.5">
+                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Cross-Boundary Contract Tracing</td>
+                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Full-Stack AST Graph
                   </td>
-                  <td className="py-3 px-4 text-[#F04452]">❌ Single-repo prompt blind</td>
-                  <td className="py-3 px-4 text-[#F04452]">❌ Disconnected silos</td>
+                  <td className="py-3.5 px-5 text-[#F04452]">❌ Single-repo prompt blind</td>
+                  <td className="py-3.5 px-5 text-[#F04452]">❌ Disconnected silos</td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4 font-medium text-[#F5F6F8]">Hallucination & Alert Fatigue</td>
-                  <td className="py-3 px-4 text-[#10B981] font-bold flex items-center gap-1.5">
+                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Hallucination & Alert Fatigue</td>
+                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" /> 0% (Mathematical syntax tree)
                   </td>
-                  <td className="py-3 px-4 text-[#F59E0B]">⚠️ High (15-20 cosmetic comments)</td>
-                  <td className="py-3 px-4 text-[#F59E0B]">⚠️ High (Hundreds of style warnings)</td>
+                  <td className="py-3.5 px-5 text-[#F59E0B]">⚠️ High (15-20 cosmetic comments)</td>
+                  <td className="py-3.5 px-5 text-[#F59E0B]">⚠️ High (Hundreds of style warnings)</td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4 font-medium text-[#F5F6F8]">Scan Latency</td>
-                  <td className="py-3 px-4 text-[#10B981] font-bold flex items-center gap-1.5">
+                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Scan Latency</td>
+                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" /> &lt; 45ms per PR
                   </td>
-                  <td className="py-3 px-4 text-[#9299A5]">30s – 2 minutes</td>
-                  <td className="py-3 px-4 text-[#9299A5]">2 – 10 minutes</td>
+                  <td className="py-3.5 px-5 text-[#9299A5]">30s – 2 minutes</td>
+                  <td className="py-3.5 px-5 text-[#9299A5]">2 – 10 minutes</td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4 font-medium text-[#F5F6F8]">Enterprise Code Privacy</td>
-                  <td className="py-3 px-4 text-[#10B981] font-bold flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> 100% In-Memory / Zero Cloud Retention
+                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Enterprise Code Privacy</td>
+                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> 100% In-Memory Zero Retention
                   </td>
-                  <td className="py-3 px-4 text-[#F59E0B]">⚠️ Third-party cloud LLM API</td>
-                  <td className="py-3 px-4 text-[#10B981]">On-prem license</td>
+                  <td className="py-3.5 px-5 text-[#F59E0B]">⚠️ Third-party cloud LLM API</td>
+                  <td className="py-3.5 px-5 text-[#10B981]">On-prem license</td>
                 </tr>
                 <tr>
-                  <td className="py-3 px-4 font-medium text-[#F5F6F8]">Actionable Remediation</td>
-                  <td className="py-3 px-4 text-[#10B981] font-bold flex items-center gap-1.5">
+                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Actionable Remediation</td>
+                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" /> AST Code Patch + Auto-Generated Test
                   </td>
-                  <td className="py-3 px-4 text-[#9299A5]">Conversational text advice</td>
-                  <td className="py-3 px-4 text-[#9299A5]">Rule IDs & code smells</td>
+                  <td className="py-3.5 px-5 text-[#9299A5]">Conversational text advice</td>
+                  <td className="py-3.5 px-5 text-[#9299A5]">Rule IDs & code smells</td>
                 </tr>
               </tbody>
             </table>
@@ -764,7 +1061,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         {/* ========================================================================= */}
         {/* 6. INTERACTIVE ROI CALCULATOR */}
         {/* ========================================================================= */}
-        <section id="roi" className="space-y-8 scroll-mt-24">
+        <section id="roi" className="space-y-8 scroll-mt-24 reveal-on-scroll">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
               <Users className="w-3.5 h-3.5" />
@@ -781,7 +1078,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <div className="max-w-3xl mx-auto p-6 sm:p-8 rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl space-y-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-[#F5F6F8]">Engineers Shipping Code:</span>
+                <span className="font-semibold text-[#F5F6F8] flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-[#896EFF]" />
+                  Engineers Shipping Code:
+                </span>
                 <span className="font-bold text-[#896EFF] text-base px-3 py-1 rounded-lg bg-[#211A35] border border-[#48366F]">
                   {teamSize} Developers
                 </span>
@@ -820,9 +1120,74 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 7. AUTH GATEWAY / ONBOARDING HUB */}
+        {/* 7. INTERACTIVE FAQ ACCORDION */}
         {/* ========================================================================= */}
-        <section id="auth-gateway" className="max-w-xl mx-auto space-y-6 pt-6 scroll-mt-24">
+        <section id="faq" className="space-y-8 scroll-mt-24 reveal-on-scroll">
+          <div className="text-center max-w-2xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Frequently Asked Questions</span>
+            </div>
+            <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
+              Everything You Need to Know
+            </h2>
+            <p className="text-xs sm:text-sm text-[#9299A5]">
+              Answers to technical architecture, privacy, compliance, and deployment questions.
+            </p>
+          </div>
+
+          <div className="max-w-3xl mx-auto space-y-3">
+            {[
+              {
+                q: 'How is REGRAVA different from CodeRabbit or GitHub Copilot?',
+                a: 'CodeRabbit and Copilot rely entirely on LLM prompts to review code. They treat source code as natural text and suffer from hallucinations, cosmetic comment spam, and prompt-context size limits. REGRAVA constructs real Abstract Syntax Trees (ASTs) to mathematically track backend API models directly to their frontend TSX consumer components in < 45ms with 0% hallucinations.',
+              },
+              {
+                q: 'Does any of our proprietary source code get stored or used for AI training?',
+                a: 'Never. REGRAVA is architected on a strict Zero-Retention policy. Analysis is executed 100% in-memory (RAM) and wiped immediately after diff verification. Your code is never sent to third-party model providers, nor is it ever used for model training. This allows REGRAVA to pass SOC2, HIPAA, and GDPR enterprise audits in days.',
+              },
+              {
+                q: 'Can REGRAVA catch broken contracts across separate backend and frontend repositories?',
+                a: 'Yes! REGRAVA links your backend repository (e.g. FastAPI, Node, Go) with your frontend repository (e.g. React, Next.js, Vue) through its repository linking engine. Whenever a PR modifies an API endpoint schema on the backend, REGRAVA queries the registered frontend AST to ensure no consumers will break.',
+              },
+              {
+                q: 'Can we test REGRAVA without granting full GitHub organization permissions?',
+                a: 'Absolutely. You can explore the 1-Click Sandbox instantly with zero credentials. If you want to test your real repository, you can provide a fine-grained GitHub Personal Access Token (PAT) with read-only scopes, or install our verified GitHub App.',
+              },
+              {
+                q: 'What happens when a breaking contract or security trap is caught?',
+                a: 'REGRAVA flags the exact line and consumer file affected, explains why it breaks runtime execution, and automatically generates an AST-verified code patch alongside a ready-to-commit Vitest or pytest assertion.',
+              },
+            ].map((faq, idx) => (
+              <div
+                key={idx}
+                className="rounded-xl bg-[#111318] border border-[#252932] overflow-hidden transition-all"
+              >
+                <button
+                  onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                  className="w-full px-5 py-4 text-left font-semibold text-xs text-[#F5F6F8] flex items-center justify-between hover:text-[#896EFF] transition-colors"
+                >
+                  <span>{faq.q}</span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-[#707783] transition-transform duration-300 ${
+                      openFaq === idx ? 'rotate-180 text-[#896EFF]' : ''
+                    }`}
+                  />
+                </button>
+                {openFaq === idx && (
+                  <div className="px-5 pb-4 text-xs text-[#9299A5] leading-relaxed border-t border-[#1C2028] pt-3">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 8. AUTH GATEWAY / ONBOARDING HUB */}
+        {/* ========================================================================= */}
+        <section id="auth-gateway" className="max-w-xl mx-auto space-y-6 pt-6 scroll-mt-24 reveal-on-scroll">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5" />
@@ -965,9 +1330,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       </main>
 
       {/* ========================================================================= */}
-      {/* 8. FOOTER */}
+      {/* 9. FOOTER */}
       {/* ========================================================================= */}
-      <footer className="relative z-10 border-t border-[#1C2028] bg-[#0B0D11] py-12 px-6 lg:px-12 text-xs text-[#707783]">
+      <footer className="relative z-10 border-t border-[#1C2028] bg-[#0B0D11] py-12 px-6 lg:px-12 text-xs text-[#707783] reveal-on-scroll">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
             <img
