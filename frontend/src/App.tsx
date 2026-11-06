@@ -287,7 +287,7 @@ export function App() {
     currentAnalysis?.findings?.filter((f) => !f.review_status || f.review_status === 'open').length || 0;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-navy-950 font-sans text-slate-100">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#08090C] font-sans text-[#D1D5DC]">
       {/* Sidebar */}
       <Sidebar
         currentTab={currentTab}
@@ -310,7 +310,7 @@ export function App() {
 
         {/* Global Error Banner */}
         {appError && (
-          <div className="bg-sentinel-rose/15 border-b border-sentinel-rose/30 px-6 py-2.5 text-xs text-sentinel-rose flex items-center justify-between">
+          <div className="bg-[#F04452]/10 border-b border-[#F04452]/25 px-6 py-2.5 text-xs text-[#F04452] flex items-center justify-between">
             <span>{appError}</span>
             <button
               onClick={() => setAppError(null)}

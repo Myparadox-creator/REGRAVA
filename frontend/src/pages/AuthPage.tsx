@@ -80,28 +80,28 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen w-full bg-navy-950 flex flex-col justify-between text-slate-100 select-none">
+    <div className="min-h-screen w-full bg-[#08090C] flex flex-col justify-between text-[#D1D5DC] select-none">
       {/* Top Banner */}
-      <header className="px-8 py-4 border-b border-navy-850 flex items-center justify-between">
+      <header className="px-8 py-4 border-b border-[#1C2028] bg-[#0B0D11] flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
             src="/regrava-icon.png"
             alt="REGRAVA"
-            className="w-9 h-9 rounded-xl object-contain shadow-sm border border-navy-750 bg-navy-950"
+            className="w-9 h-9 rounded-xl object-contain shadow-sm border border-[#252932] bg-[#08090C]"
           />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-lg tracking-tight font-sans text-white">REGRAVA</span>
-              <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-navy-800 text-slate-400 border border-navy-700">
+              <span className="font-bold text-lg tracking-tight font-sans text-[#F5F6F8]">REGRAVA</span>
+              <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#15181F] text-[#9299A5] border border-[#252932]">
                 v2.0
               </span>
             </div>
-            <p className="text-xs text-slate-400">Review &bull; Track &bull; Verify &bull; Merge with Confidence</p>
+            <p className="text-xs text-[#707783]">Review &bull; Track &bull; Verify &bull; Merge with Confidence</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <Lock className="w-3.5 h-3.5 text-sentinel-emerald" />
+        <div className="flex items-center gap-2 text-xs text-[#9299A5]">
+          <Lock className="w-3.5 h-3.5 text-[#10B981]" />
           <span>Zero-Retention Static Engine</span>
         </div>
       </header>
@@ -110,7 +110,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md space-y-5">
           {/* Brand Banner Card */}
-          <div className="rounded-2xl overflow-hidden border border-navy-800 shadow-2xl bg-navy-900">
+          <div className="rounded-2xl overflow-hidden border border-[#252932] shadow-2xl bg-[#111318]">
             <img
               src="/regrava-banner.png"
               alt="REGRAVA - Review, Track, Verify, Merge with Confidence"
@@ -120,21 +120,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
           {/* Header Subtitle */}
           <div className="text-center space-y-1">
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-[#9299A5]">
               Deterministic AST analysis of Pull Requests for security flaws and breaking API contracts.
             </p>
           </div>
 
           {/* Error Alert if any */}
           {errorMsg && (
-            <div className="p-3.5 rounded-xl bg-sentinel-amber/15 border border-sentinel-amber/30 text-xs text-sentinel-amber flex items-start gap-2.5">
+            <div className="p-3.5 rounded-xl bg-[#F59E0B]/15 border border-[#F59E0B]/30 text-xs text-[#F59E0B] flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div className="leading-relaxed">{errorMsg}</div>
             </div>
           )}
 
           {/* Main Card */}
-          <div className="p-6 rounded-2xl bg-navy-900 border border-navy-800 shadow-2xl space-y-4">
+          <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl space-y-4">
             {/* Primary Demo Button */}
             <button
               onClick={async () => {
@@ -146,25 +146,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 }
               }}
               disabled={isLoggingIn}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-sentinel-cyan to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-navy-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/40 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+              className="w-full py-3 px-4 rounded-xl bg-[#7657FF] hover:bg-[#896EFF] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-950/40 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
             >
-              <Sparkles className="w-4 h-4 text-navy-950" />
+              <Sparkles className="w-4 h-4 text-white" />
               <span>{isLoggingIn ? 'Launching Sandbox...' : 'Explore Demo Sandbox (1-Click)'}</span>
               <ArrowRight className="w-4 h-4 ml-1" />
             </button>
 
             <div className="flex items-center gap-3 my-2">
-              <div className="h-px bg-navy-800 flex-1" />
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="h-px bg-[#252932] flex-1" />
+              <span className="text-[11px] font-semibold text-[#707783] uppercase tracking-wider">
                 Or Sign In
               </span>
-              <div className="h-px bg-navy-800 flex-1" />
+              <div className="h-px bg-[#252932] flex-1" />
             </div>
 
             {/* Google Login */}
             <button
               onClick={handleGoogleLogin}
-              className="w-full py-2.5 px-4 rounded-xl bg-navy-850 hover:bg-navy-800 border border-navy-750 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
+              className="w-full py-2.5 px-4 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path
@@ -190,18 +190,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             {/* GitHub Login */}
             <button
               onClick={handleGitHubLogin}
-              className="w-full py-2.5 px-4 rounded-xl bg-navy-850 hover:bg-navy-800 border border-navy-750 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
+              className="w-full py-2.5 px-4 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
             >
               <Github className="w-4 h-4 text-white" />
               <span>Continue with GitHub</span>
             </button>
 
             {/* Direct GitHub Token (PAT) Option */}
-            <div className="pt-2 border-t border-navy-800">
+            <div className="pt-2 border-t border-[#1C2028]">
               <button
                 type="button"
                 onClick={() => setShowTokenForm(!showTokenForm)}
-                className="w-full text-center text-xs text-sentinel-cyan hover:text-cyan-300 font-medium flex items-center justify-center gap-1.5 py-1 transition-colors"
+                className="w-full text-center text-xs text-[#896EFF] hover:text-[#7657FF] font-medium flex items-center justify-center gap-1.5 py-1 transition-colors"
               >
                 <KeyRound className="w-3.5 h-3.5" />
                 <span>{showTokenForm ? 'Hide Token Sign-In' : 'Or Sign In with GitHub Token (PAT)'}</span>
@@ -210,15 +210,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               {showTokenForm && (
                 <form
                   onSubmit={handleTokenSubmit}
-                  className="mt-3 space-y-3 p-3.5 rounded-xl bg-navy-950/70 border border-navy-750"
+                  className="mt-3 space-y-3 p-3.5 rounded-xl bg-[#0B0D11] border border-[#252932]"
                 >
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-semibold text-slate-300">Personal Access Token</span>
+                    <span className="font-semibold text-[#D1D5DC]">Personal Access Token</span>
                     <a
                       href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=REGRAVA%20Security%20Scanner"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sentinel-cyan hover:underline flex items-center gap-1 text-[10px]"
+                      className="text-[#896EFF] hover:underline flex items-center gap-1 text-[10px]"
                     >
                       Generate Token <ExternalLink className="w-2.5 h-2.5" />
                     </a>
@@ -229,17 +229,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
                     placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                    className="w-full px-3 py-2 rounded-lg bg-navy-900 border border-navy-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sentinel-cyan font-mono"
+                    className="w-full px-3 py-2 rounded-lg bg-[#15181F] border border-[#252932] text-xs text-[#F5F6F8] placeholder-[#707783] focus:outline-none focus:border-[#7657FF] font-mono"
                   />
 
-                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                  <p className="text-[10px] text-[#707783] leading-relaxed">
                     Instantly load and scan your real public or private repositories without configuring GitHub OAuth.
                   </p>
 
                   <button
                     type="submit"
                     disabled={isConnectingToken || !tokenInput.trim()}
-                    className="w-full py-2 px-3 rounded-lg bg-sentinel-cyan hover:bg-cyan-400 text-navy-950 font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    className="w-full py-2 px-3 rounded-lg bg-[#7657FF] hover:bg-[#896EFF] text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                   >
                     {isConnectingToken ? (
                       <>
@@ -260,27 +260,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
           {/* Guarantee Pills */}
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="p-3 rounded-xl bg-navy-900/60 border border-navy-850 space-y-1">
-              <Cpu className="w-4 h-4 mx-auto text-sentinel-cyan" />
-              <div className="text-[11px] font-semibold text-slate-200">Deterministic</div>
-              <div className="text-[10px] text-slate-400">AST & Diff Parsers</div>
+            <div className="p-3 rounded-xl bg-[#111318] border border-[#1C2028] space-y-1">
+              <Cpu className="w-4 h-4 mx-auto text-[#896EFF]" />
+              <div className="text-[11px] font-semibold text-[#F5F6F8]">Deterministic</div>
+              <div className="text-[10px] text-[#707783]">AST & Diff Parsers</div>
             </div>
-            <div className="p-3 rounded-xl bg-navy-900/60 border border-navy-850 space-y-1">
-              <Layers className="w-4 h-4 mx-auto text-sentinel-emerald" />
-              <div className="text-[11px] font-semibold text-slate-200">Zero Retention</div>
-              <div className="text-[10px] text-slate-400">In-memory analysis</div>
+            <div className="p-3 rounded-xl bg-[#111318] border border-[#1C2028] space-y-1">
+              <Layers className="w-4 h-4 mx-auto text-[#10B981]" />
+              <div className="text-[11px] font-semibold text-[#F5F6F8]">Zero Retention</div>
+              <div className="text-[10px] text-[#707783]">In-memory analysis</div>
             </div>
-            <div className="p-3 rounded-xl bg-navy-900/60 border border-navy-850 space-y-1">
-              <FileCode className="w-4 h-4 mx-auto text-sentinel-amber" />
-              <div className="text-[11px] font-semibold text-slate-200">Fine-Grained</div>
-              <div className="text-[10px] text-slate-400">Read-only GitHub App</div>
+            <div className="p-3 rounded-xl bg-[#111318] border border-[#1C2028] space-y-1">
+              <FileCode className="w-4 h-4 mx-auto text-[#F59E0B]" />
+              <div className="text-[11px] font-semibold text-[#F5F6F8]">Fine-Grained</div>
+              <div className="text-[10px] text-[#707783]">Read-only GitHub App</div>
             </div>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="px-8 py-4 border-t border-navy-850 text-center text-xs text-slate-500">
+      <footer className="px-8 py-4 border-t border-[#1C2028] text-center text-xs text-[#707783]">
         REGRAVA Platform &bull; Deterministic Security & Regression Intelligence for Code Reviews
       </footer>
     </div>

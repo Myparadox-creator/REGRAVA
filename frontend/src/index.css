@@ -4,27 +4,78 @@
 
 :root {
   color-scheme: dark;
+
+  /* Background Colors */
+  --bg-primary: #08090C;
+  --bg-sidebar: #0B0D11;
+  --bg-header: #0B0D11;
+  --bg-content: #08090C;
+  --bg-card: #111318;
+  --bg-card-secondary: #15181F;
+  --bg-card-hover: #15181F;
+  --bg-elevated: #1B1F27;
+  --bg-modal: #15181F;
+
+  /* Borders & Separators */
+  --border-default: #252932;
+  --border-subtle: #1C2028;
+  --border-active: #454B58;
+  --border-hover: #555D6B;
+
+  /* Typography */
+  --text-primary: #F5F6F8;
+  --text-secondary: #D1D5DC;
+  --text-muted: #9299A5;
+  --text-dim: #707783;
+  --text-disabled: #515762;
+
+  /* Brand Accent: REGRAVA Purple */
+  --brand-primary: #7657FF;
+  --brand-hover: #896EFF;
+  --brand-soft: #211A35;
+  --brand-border: #48366F;
+
+  /* Semantic Status Colors */
+  --status-success: #10B981;
+  --status-warning: #F59E0B;
+  --status-danger: #F04452;
+  --status-active: #896EFF;
+  --status-info: #9299A5;
 }
 
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #090d16;
-  color: #f1f5f9;
+  background-color: #08090C;
+  color: #D1D5DC;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbars */
+/* Obsidian Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #0B0D11;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+  background: #252932;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #454B58;
+}
+
+/* Focus styles for keyboard accessibility */
+:focus-visible {
+  outline: 2px solid #7657FF;
+  outline-offset: 1px;
+}
+
+/* Text Selection */
+::selection {
+  background: rgba(118, 87, 255, 0.35);
+  color: #FFFFFF;
 }
