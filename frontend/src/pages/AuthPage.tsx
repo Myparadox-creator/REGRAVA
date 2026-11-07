@@ -1,16 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
   Github,
-  Lock,
   ArrowRight,
-  Cpu,
   Layers,
   AlertCircle,
   KeyRound,
   ExternalLink,
   RefreshCw,
-  ShieldCheck,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -18,17 +15,16 @@ import {
   Zap,
   Copy,
   Check,
-  ChevronRight,
   ChevronDown,
   Code2,
   Users,
   BarChart3,
-  GitPullRequest,
   CheckCheck,
-  Play,
-  Activity,
   HelpCircle,
   Sliders,
+  Network,
+  Radio,
+  Flame,
 } from 'lucide-react';
 import { getGoogleAuthUrl, getGitHubAuthUrl } from '../services/api';
 
@@ -38,14 +34,15 @@ interface AuthPageProps {
   onConnectToken?: (token: string) => Promise<void>;
 }
 
-type SimulatorTab = 'contract' | 'sql' | 'secrets' | 'tenancy';
+type GraphScenario = 'healthy' | 'broken' | 'healed' | 'sqli' | 'secret';
 
 interface LayerState {
   id: number;
   name: string;
-  desc: string;
-  status: 'passed' | 'warning' | 'fixed';
+  category: string;
+  status: 'clean' | 'threat' | 'remediated';
   points: number;
+  runtimeLatency: string;
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
@@ -58,43 +55,172 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [tokenInput, setTokenInput] = useState('');
   const [isConnectingToken, setIsConnectingToken] = useState(false);
 
-  // Scroll Progress & Floating Trigger State
+  // Telemetry & Clock
+  const [microClock, setMicroClock] = useState('00:00:00.000');
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showFloatingPill, setShowFloatingPill] = useState(false);
+  const [copiedCli, setCopiedCli] = useState(false);
 
-  // Interactive Simulator State
-  const [activeTab, setActiveTab] = useState<SimulatorTab>('contract');
-  const [simulatorMode, setSimulatorMode] = useState<'diff' | 'remediation'>('diff');
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanStep, setScanStep] = useState<number>(3); // 3 means scan complete
-  const [copiedTest, setCopiedTest] = useState(false);
+  // Interactive AST Graph Visualizer State
+  const [graphScenario, setGraphScenario] = useState<GraphScenario>('broken');
+  const [activeAstNode, setActiveAstNode] = useState<string | null>('fastapi');
+  const [copiedTestProof, setCopiedTestProof] = useState(false);
 
-  // Interactive 7-Layer Health Scorecard State
+  // In-Browser CLI Terminal Simulator State
+  const [terminalLog, setTerminalLog] = useState<string[]>([
+    '$ regrava scan --pr 42 --zero-retention --cross-repo',
+    '⚡ Initializing ephemeral in-memory memory sandbox (0-disk retention)...',
+    '✓ AST Syntax Tree generated for backend [app/schemas/user.py] (9.4ms)',
+    '✓ Linked frontend repository registered: [Myparadox-creator/REGRAVA-frontend]',
+    '✓ Cross-boundary router mapped 14 consumer TSX/JSX AST components (16.2ms)',
+    '🚨 CRITICAL REGRESSION: Field "user_id" removed in backend response schema.',
+    '   Affected Consumer: frontend/src/components/UserProfile.tsx:34 <UserProfile id={user_id}/>',
+    '   Runtime Impact: Uncaught TypeError: Cannot read properties of undefined (reading "user_id")',
+    '✓ Auto-synthesized Vitest contract proof generated at .regrava/proofs/test_pr42.ts (3.1ms)',
+    '✨ Analysis finished in 34.2ms | 0 bytes persisted | Zero cloud retention.',
+  ]);
+  const [terminalExecuting, setTerminalExecuting] = useState(false);
+
+  // Stochastic vs Deterministic Arena Toggle
+  const [arenaMode, setArenaMode] = useState<'deterministic' | 'stochastic'>('deterministic');
+
+  // Interactive 7-Layer Constellation State
   const [layers, setLayers] = useState<LayerState[]>([
-    { id: 1, name: 'Contract Integrity', desc: 'FastAPI schema to React TSX component mapping', status: 'warning', points: 15 },
-    { id: 2, name: 'AST Taint & SQLi', desc: 'Deterministic AST parameter interpolation check', status: 'passed', points: 15 },
-    { id: 3, name: 'High-Entropy Secrets', desc: 'Scanning for leaked payment and cloud API credentials', status: 'passed', points: 15 },
-    { id: 4, name: 'Auth & Tenancy Boundary', desc: 'Enforcing multi-tenant org_id database filters', status: 'warning', points: 15 },
-    { id: 5, name: 'Test Evidence Gaps', desc: 'Auto-generating verified Vitest/pytest assertions', status: 'passed', points: 15 },
-    { id: 6, name: 'Dependency Manifest Health', desc: 'Live CVE cross-referencing on lockfiles', status: 'passed', points: 15 },
-    { id: 7, name: 'Ephemeral Memory Sandbox', desc: '100% in-memory processing with zero retention', status: 'passed', points: 10 },
+    { id: 1, name: 'Cross-Boundary Contract Guard', category: 'AST Interface Graph', status: 'threat', points: 15, runtimeLatency: '11.2ms' },
+    { id: 2, name: 'Deterministic Taint & SQLi', category: 'Syntax Tree Taint', status: 'clean', points: 15, runtimeLatency: '8.4ms' },
+    { id: 3, name: 'High-Entropy Secret Analyzer', category: 'Shannon Entropy', status: 'clean', points: 15, runtimeLatency: '4.1ms' },
+    { id: 4, name: 'Multi-Tenant Tenancy Filter', category: 'AST Isolation Check', status: 'threat', points: 15, runtimeLatency: '9.8ms' },
+    { id: 5, name: 'Automated Vitest/pytest Proofs', category: 'Formal Verification', status: 'clean', points: 15, runtimeLatency: '12.0ms' },
+    { id: 6, name: 'Dependency Lockfile Health', category: 'OSV / CVE Graph', status: 'clean', points: 15, runtimeLatency: '6.7ms' },
+    { id: 7, name: 'Zero-Retention RAM Sandbox', category: 'Ephemeral In-Memory', status: 'clean', points: 10, runtimeLatency: '2.0ms' },
   ]);
 
-  // Interactive ROI Calculator State
-  const [teamSize, setTeamSize] = useState<number>(20);
+  // Financial ROI Engine State
+  const [teamSize, setTeamSize] = useState<number>(25);
+  const [prWeeklyVelocity, setPrWeeklyVelocity] = useState<number>(45);
 
-  // Interactive FAQ Accordion State
+  // Technical FAQ Accordion State
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  // Scroll Progress & IntersectionObserver for Scroll Reveal
+  // Canvas Ref for Ambient Particle Constellation
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Background Canvas Ambient Particles with Mouse Connection
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Particle nodes
+    const particleCount = Math.min(width < 768 ? 35 : 70, 80);
+    const particles = Array.from({ length: particleCount }).map(() => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.45,
+      vy: (Math.random() - 0.5) * 0.45,
+      radius: Math.random() * 1.8 + 0.8,
+      hue: Math.random() > 0.6 ? 260 : 160, // Purple or emerald hints
+    }));
+
+    let mouseX = -1000;
+    let mouseY = -1000;
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      // Draw connections
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 110) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(118, 87, 255, ${0.15 * (1 - dist / 110)})`;
+            ctx.lineWidth = 0.7;
+            ctx.stroke();
+          }
+        }
+
+        // Mouse interaction beam
+        const mdx = particles[i].x - mouseX;
+        const mdy = particles[i].y - mouseY;
+        const mdist = Math.sqrt(mdx * mdx + mdy * mdy);
+        if (mdist < 140) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(mouseX, mouseY);
+          ctx.strokeStyle = `rgba(16, 185, 129, ${0.28 * (1 - mdist / 140)})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        // Particle update
+        particles[i].x += particles[i].vx;
+        particles[i].y += particles[i].vy;
+
+        if (particles[i].x < 0 || particles[i].x > width) particles[i].vx *= -1;
+        if (particles[i].y < 0 || particles[i].y > height) particles[i].vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(particles[i].x, particles[i].y, particles[i].radius, 0, Math.PI * 2);
+        ctx.fillStyle = particles[i].hue === 260 ? 'rgba(137, 110, 255, 0.7)' : 'rgba(16, 185, 129, 0.7)';
+        ctx.fill();
+      }
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('mousemove', handleMouseMove);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  // Telemetry Micro-Clock
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const s = String(now.getSeconds()).padStart(2, '0');
+      const ms = String(now.getMilliseconds()).padStart(3, '0');
+      setMicroClock(`${h}:${m}:${s}.${ms}`);
+    }, 47);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Scroll Progress and Observer
   useEffect(() => {
     const handleScroll = () => {
       const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
       if (totalHeight > 0) {
-        const pct = (window.scrollY / totalHeight) * 100;
-        setScrollProgress(pct);
+        setScrollProgress((window.scrollY / totalHeight) * 100);
       }
-      setShowFloatingPill(window.scrollY > 420);
+      setShowFloatingPill(window.scrollY > 450);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -117,39 +243,87 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     elements.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, [layers, activeTab]);
+  }, [layers, graphScenario]);
 
-  // Trigger live interactive scan simulation
-  const handleRunLiveScan = () => {
-    setIsScanning(true);
-    setScanStep(0);
+  // Execute Simulated CLI Commands
+  const runTerminalCommand = (cmd: string) => {
+    setTerminalExecuting(true);
+    setTerminalLog((prev) => [...prev, `$ ${cmd}`, '⚡ Running deterministic compiler telemetry...']);
 
-    setTimeout(() => setScanStep(1), 350);
-    setTimeout(() => setScanStep(2), 700);
     setTimeout(() => {
-      setScanStep(3);
-      setIsScanning(false);
-    }, 1100);
+      if (cmd.includes('cross-repo') || cmd.includes('pr 42')) {
+        setTerminalLog((prev) => [
+          ...prev,
+          '✓ In-memory volatile RAM initialized at 0x7FFF940B (0.0ms)',
+          '✓ Parsed backend Pydantic schema in 12.4ms',
+          '✓ Cross-analyzed 14 frontend TSX files in 18.2ms',
+          '🚨 1 Breaking Contract detected on consumer <UserProfile id={user_id}/>',
+          '✨ Synthesized test proof at .regrava/test_contract.spec.ts in 3.6ms',
+        ]);
+      } else if (cmd.includes('taint')) {
+        setTerminalLog((prev) => [
+          ...prev,
+          '✓ AST Taint Analysis started on 4 modified database functions...',
+          '🚨 TAINT VIOLATION: Variable client_query flows unescaped to db.fetch_all()',
+          '✓ Auto-generated parameterized query patch recommended (14.2ms)',
+        ]);
+      } else {
+        setTerminalLog((prev) => [
+          ...prev,
+          '✓ Fleet Security Radar scanned 12 repositories across 7 layers.',
+          '✓ Zero code retention certified. Ephemeral memory wiped.',
+          '✨ Fleet Posture Score: 98.4 / 100 [SECURE]',
+        ]);
+      }
+      setTerminalExecuting(false);
+    }, 600);
   };
 
-  // Toggle fixing a layer to watch the score climb dynamically
-  const handleToggleLayerFix = (id: number) => {
+  const handleToggleLayer = (id: number) => {
     setLayers((prev) =>
-      prev.map((layer) => {
-        if (layer.id === id) {
+      prev.map((l) => {
+        if (l.id === id) {
           return {
-            ...layer,
-            status: layer.status === 'warning' ? 'fixed' : 'warning',
+            ...l,
+            status: l.status === 'threat' ? 'remediated' : 'threat',
           };
         }
-        return layer;
+        return l;
       })
     );
   };
 
-  const calculatedHealthScore = layers.reduce((acc, l) => {
-    return l.status === 'passed' || l.status === 'fixed' ? acc + l.points : acc;
+  const fleetScore = layers.reduce((acc, l) => {
+    return l.status === 'clean' || l.status === 'remediated' ? acc + l.points : acc;
   }, 0);
+
+  // Dynamic ROI computations
+  const totalPrsMonthly = prWeeklyVelocity * 4.3;
+  const hoursSavedMonthly = Math.round(teamSize * 15.5);
+  const dollarsSavedMonthly = Math.round(hoursSavedMonthly * 82);
+  const outagesPreventedYearly = Math.max(1, Math.round(teamSize * 0.32));
+  const financialRoiMultiplier = ((dollarsSavedMonthly * 12) / (teamSize * 240)).toFixed(1);
+
+  const scrollToAuth = () => {
+    const el = document.getElementById('auth-gateway');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollToGraph = () => {
+    const el = document.getElementById('interactive-ast-graph');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const copyToClipboard = (text: string, type: 'cli' | 'proof') => {
+    navigator.clipboard.writeText(text);
+    if (type === 'cli') {
+      setCopiedCli(true);
+      setTimeout(() => setCopiedCli(false), 2000);
+    } else {
+      setCopiedTestProof(true);
+      setTimeout(() => setCopiedTestProof(false), 2000);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setErrorMsg(null);
@@ -204,40 +378,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
   };
 
-  const scrollToAuth = () => {
-    const el = document.getElementById('auth-gateway');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const scrollToSimulator = () => {
-    const el = document.getElementById('live-simulator');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedTest(true);
-    setTimeout(() => setCopiedTest(false), 2000);
-  };
-
-  // Dynamic ROI calculation
-  const hoursSavedPerMonth = teamSize * 14;
-  const dollarsSavedPerMonth = Math.round(hoursSavedPerMonth * 75);
-  const outagesPreventedPerYear = Math.max(1, Math.round(teamSize * 0.25));
-
-  // Frameworks Marquee List
   const frameworks = [
     'FastAPI',
     'Next.js 15',
     'React 19',
     'TypeScript 5.7',
-    'Python 3.12',
     'Pydantic v2',
     'Go 1.23',
+    'Python 3.12',
     'Vitest',
     'Pytest',
     'GitHub Actions',
@@ -249,10 +397,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#08090C] text-[#D1D5DC] font-sans antialiased selection:bg-[#7657FF]/30 selection:text-white relative overflow-x-hidden">
+    <div className="min-h-screen w-full bg-[#08090C] text-[#D1D5DC] font-sans antialiased selection:bg-[#7657FF]/35 selection:text-white relative overflow-x-hidden">
+      {/* Background Ambient Canvas Constellation */}
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 pointer-events-none z-0 opacity-45"
+      />
+
+      {/* Radiant Ambient Radial Glows */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[550px] bg-gradient-to-b from-[#7657FF]/20 via-[#48366F]/10 to-transparent blur-[140px] pointer-events-none z-0" />
+      <div className="fixed bottom-0 right-10 w-[600px] h-[500px] bg-gradient-to-t from-[#10B981]/15 to-transparent blur-[160px] pointer-events-none z-0" />
+
       {/* Top Scroll Depth Progress Bar */}
       <div
-        className="fixed top-0 left-0 h-[2.5px] bg-gradient-to-r from-[#7657FF] via-[#A78BFA] to-[#10B981] z-50 transition-all duration-75"
+        className="fixed top-0 left-0 h-[2.5px] bg-gradient-to-r from-[#7657FF] via-[#A78BFA] to-[#10B981] z-50 transition-all duration-75 shadow-lg shadow-purple-500/50"
         style={{ width: `${scrollProgress}%` }}
       />
 
@@ -260,17 +418,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       <aside
         aria-label="Quick Actions"
         className={`fixed bottom-6 right-6 z-40 transition-all duration-500 ease-out ${
-          showFloatingPill ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-6 scale-95 pointer-events-none'
+          showFloatingPill
+            ? 'opacity-100 translate-y-0 scale-100'
+            : 'opacity-0 translate-y-6 scale-95 pointer-events-none'
         }`}
       >
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[#111318]/90 backdrop-blur-xl border border-[#48366F] shadow-2xl shadow-purple-950/60 glow-purple">
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[#111318]/90 backdrop-blur-2xl border border-[#48366F] shadow-2xl shadow-purple-950/70 glow-purple">
           <button
             onClick={onLoginDemo}
             disabled={isLoggingIn}
-            className="px-4 py-2 rounded-xl bg-[#7657FF] hover:bg-[#896EFF] text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#7657FF] to-[#896EFF] hover:brightness-110 text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Sparkles className="w-3.5 h-3.5 text-white" />
-            <span>{isLoggingIn ? 'Spinning...' : 'Launch 1-Click Sandbox'}</span>
+            <Sparkles className="w-3.5 h-3.5 text-white animate-spin-slow" />
+            <span>{isLoggingIn ? 'Spinning Sandbox...' : 'Launch 1-Click Sandbox'}</span>
           </button>
           <button
             onClick={scrollToAuth}
@@ -282,58 +442,66 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </div>
       </aside>
 
-      {/* Background ambient lighting */}
-      <div className="fixed inset-0 pointer-events-none bg-radial-glow z-0" />
-      <div className="fixed inset-0 pointer-events-none bg-grid-pattern opacity-60 z-0" />
-
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0B0D11]/85 border-b border-[#1C2028] px-6 lg:px-12 py-3.5 transition-all">
+      {/* ========================================================================= */}
+      {/* 0. PERSISTENT TELEMETRY HEADER */}
+      {/* ========================================================================= */}
+      <header className="sticky top-0 z-50 backdrop-blur-2xl bg-[#0B0D11]/80 border-b border-[#1C2028] px-6 lg:px-12 py-3 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           {/* Logo & Brand */}
           <div
             className="flex items-center gap-3 cursor-pointer group"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            <img
-              src="/regrava-icon.png"
-              alt="REGRAVA"
-              className="w-8 h-8 rounded-lg object-contain border border-[#252932] bg-[#08090C] shadow-md shadow-purple-950/20 group-hover:border-[#7657FF] transition-all"
-            />
+            <div className="relative">
+              <img
+                src="/regrava-icon.png"
+                alt="REGRAVA"
+                className="w-8 h-8 rounded-lg object-contain border border-[#252932] bg-[#08090C] shadow-md shadow-purple-950/20 group-hover:border-[#7657FF] transition-all"
+              />
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#10B981] border-2 border-[#0B0D11]" />
+            </div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-base tracking-tight text-[#F5F6F8]">REGRAVA</span>
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#211A35] text-[#896EFF] border border-[#48366F]">
                 v2.0
               </span>
             </div>
-            <div className="hidden md:flex items-center gap-1.5 ml-2 pl-3 border-l border-[#252932] text-xs text-[#9299A5]">
-              <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
-              <span>Deterministic AST Online</span>
+            <div className="hidden xl:flex items-center gap-2 ml-4 pl-4 border-l border-[#252932] text-[11px] font-mono text-[#707783]">
+              <span className="text-[#10B981] font-semibold flex items-center gap-1">
+                <Radio className="w-3 h-3 animate-pulse" /> AST LIVE
+              </span>
+              <span>•</span>
+              <span>LATENCY: &lt; 34.2ms</span>
+              <span>•</span>
+              <span className="text-[#9299A5]">{microClock}</span>
             </div>
           </div>
 
-          {/* Center Links */}
+          {/* Navigation Links */}
           <nav className="hidden lg:flex items-center gap-7 text-xs font-medium text-[#9299A5]">
-            <a href="#live-simulator" className="hover:text-[#F5F6F8] transition-colors">
-              Interactive Simulator
+            <a href="#interactive-ast-graph" className="hover:text-[#F5F6F8] transition-colors flex items-center gap-1">
+              <Network className="w-3.5 h-3.5 text-[#896EFF]" />
+              <span>Neural AST Graph</span>
             </a>
-            <a href="#wedge" className="hover:text-[#F5F6F8] transition-colors">
-              The Moat
+            <a href="#cli-terminal" className="hover:text-[#F5F6F8] transition-colors flex items-center gap-1">
+              <Terminal className="w-3.5 h-3.5 text-[#10B981]" />
+              <span>CLI Simulator</span>
             </a>
-            <a href="#seven-pillars" className="hover:text-[#F5F6F8] transition-colors">
-              7-Layer Posture
+            <a href="#head-to-head" className="hover:text-[#F5F6F8] transition-colors">
+              Stochastic vs. AST
             </a>
-            <a href="#comparison" className="hover:text-[#F5F6F8] transition-colors">
-              Comparison
+            <a href="#constellation" className="hover:text-[#F5F6F8] transition-colors">
+              7-Layer Radar
             </a>
-            <a href="#roi" className="hover:text-[#F5F6F8] transition-colors">
-              ROI Calculator
+            <a href="#roi-engine" className="hover:text-[#F5F6F8] transition-colors">
+              Financial ROI
             </a>
             <a href="#faq" className="hover:text-[#F5F6F8] transition-colors">
               FAQ
             </a>
           </nav>
 
-          {/* Right Action Buttons */}
+          {/* Right CTAs */}
           <div className="flex items-center gap-3">
             <button
               onClick={scrollToAuth}
@@ -344,7 +512,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <button
               onClick={onLoginDemo}
               disabled={isLoggingIn}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#7657FF] hover:bg-[#896EFF] text-white shadow-lg shadow-purple-900/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 disabled:opacity-50"
+              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-[#7657FF] to-[#896EFF] hover:brightness-110 text-white shadow-lg shadow-purple-900/40 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 disabled:opacity-50"
             >
               <Sparkles className="w-3.5 h-3.5 text-white" />
               <span>{isLoggingIn ? 'Launching...' : '1-Click Sandbox'}</span>
@@ -353,83 +521,88 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </div>
       </header>
 
-      {/* Main Landing Page Content */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 pt-12 pb-24 space-y-32">
+      {/* Main Content Body */}
+      <main className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 pt-14 pb-28 space-y-36">
         {/* ========================================================================= */}
-        {/* 1. HERO SECTION */}
+        {/* 1. HERO SECTION: CYBERNETIC COMMAND DECK */}
         {/* ========================================================================= */}
-        <section className="text-center pt-6 pb-4 max-w-4xl mx-auto space-y-8 reveal-on-scroll is-visible">
-          {/* Announcement Beacon */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111318] border border-[#252932] shadow-inner text-xs font-medium text-[#D1D5DC] hover:border-[#48366F] transition-all">
+        <section className="text-center pt-8 pb-4 max-w-5xl mx-auto space-y-8 reveal-on-scroll is-visible">
+          {/* Cybernetic Telemetry Pill */}
+          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#111318]/90 backdrop-blur-md border border-[#48366F] shadow-lg shadow-purple-950/40 text-xs font-mono text-[#D1D5DC]">
             <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#7657FF] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#7657FF]"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]"></span>
             </span>
-            <span className="text-[#F5F6F8] font-semibold">Zero-Retention Deterministic AST Engine</span>
-            <span className="text-[#707783]">•</span>
-            <span className="text-[#896EFF]">No LLM Hallucinations</span>
-            <ChevronRight className="w-3 h-3 text-[#707783]" />
+            <span className="text-[#F5F6F8] font-bold">DETERMINISTIC COMPILER GRAPH</span>
+            <span className="text-[#48366F]">|</span>
+            <span className="text-[#896EFF]">ZERO CLOUD RETENTION</span>
+            <span className="text-[#48366F]">|</span>
+            <span className="text-[#10B981]">0% HALLUCINATION RATE</span>
           </div>
 
-          {/* Main Headline */}
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#F5F6F8] leading-[1.12]">
-            Stop Breaking Production <br />
-            <span className="bg-gradient-to-r from-[#7657FF] via-[#A78BFA] to-[#10B981] bg-clip-text text-transparent">
-              Before You Hit Merge.
-            </span>
+          {/* Monumental Headline */}
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#F5F6F8] leading-[1.08]">
+            Mathematical Certainty <br />
+            <span className="text-hologram">For Every Pull Request.</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-base sm:text-lg text-[#9299A5] max-w-2xl mx-auto leading-relaxed">
-            Generic AI reviewers flood PRs with noisy style comments. REGRAVA maps your backend schemas to frontend UI components, flags contract breaks in <span className="text-[#F5F6F8] font-semibold">&lt; 45ms</span>, and auto-generates verified test proofs with <span className="text-[#10B981] font-semibold">zero cloud retention</span>.
+          <p className="text-base sm:text-lg text-[#9299A5] max-w-3xl mx-auto leading-relaxed">
+            We didn’t wrap an LLM in a prompt. We built a polyglot compiler graph that tracks every schema change between your backend and frontend in <span className="text-[#F5F6F8] font-semibold">&lt; 35ms</span> before code reaches production.
           </p>
 
-          {/* Hero CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+          {/* CLI Copy Chip + CTAs */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-3">
             <button
               onClick={onLoginDemo}
               disabled={isLoggingIn}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-[#7657FF] hover:bg-[#896EFF] text-white font-bold text-sm shadow-xl shadow-purple-900/40 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2.5"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#7657FF] via-[#896EFF] to-[#7657FF] bg-size-200 hover:brightness-110 text-white font-extrabold text-sm shadow-2xl shadow-purple-900/60 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2.5"
             >
               <Sparkles className="w-4 h-4 text-white" />
-              <span>{isLoggingIn ? 'Spinning Sandbox...' : 'Explore Demo Sandbox (1-Click)'}</span>
+              <span>{isLoggingIn ? 'Spinning Sandbox...' : 'Explore Live Sandbox (1-Click)'}</span>
               <ArrowRight className="w-4 h-4 ml-1" />
             </button>
 
-            <button
-              onClick={scrollToAuth}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#111318] hover:bg-[#15181F] border border-[#252932] hover:border-[#454B58] text-[#F5F6F8] font-semibold text-sm transition-all flex items-center justify-center gap-2"
+            {/* Quick CLI Copy Pill */}
+            <div
+              onClick={() => copyToClipboard('npx @regrava/sentinel scan --live', 'cli')}
+              className="w-full sm:w-auto px-4 py-3 rounded-xl bg-[#111318] hover:bg-[#15181F] border border-[#252932] hover:border-[#48366F] cursor-pointer flex items-center justify-between gap-3 text-xs font-mono transition-all group"
             >
-              <Github className="w-4 h-4 text-white" />
-              <span>Scan Your Repository</span>
-            </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[#896EFF] font-bold">$</span>
+                <span className="text-[#D1D5DC]">npx @regrava/sentinel scan --live</span>
+              </div>
+              <span className="p-1 rounded bg-[#1B1F27] text-[#9299A5] group-hover:text-[#F5F6F8]">
+                {copiedCli ? <Check className="w-3.5 h-3.5 text-[#10B981]" /> : <Copy className="w-3.5 h-3.5" />}
+              </span>
+            </div>
 
             <button
-              onClick={scrollToSimulator}
-              className="w-full sm:w-auto px-5 py-3.5 rounded-xl text-xs font-semibold text-[#9299A5] hover:text-[#F5F6F8] hover:bg-[#111318] border border-transparent hover:border-[#252932] transition-all flex items-center justify-center gap-1.5"
+              onClick={scrollToGraph}
+              className="w-full sm:w-auto px-5 py-3 rounded-xl text-xs font-semibold text-[#9299A5] hover:text-[#F5F6F8] hover:bg-[#111318] border border-transparent hover:border-[#252932] transition-all flex items-center justify-center gap-1.5"
             >
-              <Terminal className="w-4 h-4 text-[#896EFF]" />
-              <span>Live Diff Simulator ↓</span>
+              <Network className="w-4 h-4 text-[#896EFF]" />
+              <span>Interactive AST Graph ↓</span>
             </button>
           </div>
 
-          {/* Fast Spec Counters */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-8 max-w-3xl mx-auto text-left">
-            <div className="p-4 rounded-xl bg-[#111318]/80 border border-[#1C2028] hover:border-[#252932] transition-all">
-              <div className="text-2xl font-extrabold text-[#F5F6F8]">&lt; 45ms</div>
-              <div className="text-xs text-[#707783] mt-0.5">AST Analysis Speed</div>
+          {/* High-Tech Spec HUD Strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-10 max-w-4xl mx-auto text-left">
+            <div className="p-4 rounded-xl glass-obsidian">
+              <div className="text-2xl font-black text-[#F5F6F8] font-mono">&lt; 34.2ms</div>
+              <div className="text-xs text-[#707783] mt-0.5">AST Execution Latency</div>
             </div>
-            <div className="p-4 rounded-xl bg-[#111318]/80 border border-[#1C2028] hover:border-[#10B981]/40 transition-all">
-              <div className="text-2xl font-extrabold text-[#10B981]">0%</div>
-              <div className="text-xs text-[#707783] mt-0.5">Hallucination Rate</div>
+            <div className="p-4 rounded-xl glass-obsidian border-[#10B981]/30">
+              <div className="text-2xl font-black text-[#10B981] font-mono">0.00%</div>
+              <div className="text-xs text-[#707783] mt-0.5">Stochastic Hallucination</div>
             </div>
-            <div className="p-4 rounded-xl bg-[#111318]/80 border border-[#1C2028] hover:border-[#896EFF]/40 transition-all">
-              <div className="text-2xl font-extrabold text-[#896EFF]">100%</div>
-              <div className="text-xs text-[#707783] mt-0.5">In-Memory Zero Retention</div>
+            <div className="p-4 rounded-xl glass-obsidian border-[#896EFF]/30">
+              <div className="text-2xl font-black text-[#896EFF] font-mono">0 BYTES</div>
+              <div className="text-xs text-[#707783] mt-0.5">Volatile Memory Retention</div>
             </div>
-            <div className="p-4 rounded-xl bg-[#111318]/80 border border-[#1C2028] hover:border-[#252932] transition-all">
-              <div className="text-2xl font-extrabold text-[#F5F6F8]">7-Layer</div>
-              <div className="text-xs text-[#707783] mt-0.5">Fleet Security Radar</div>
+            <div className="p-4 rounded-xl glass-obsidian">
+              <div className="text-2xl font-black text-[#F5F6F8] font-mono">7-LAYER</div>
+              <div className="text-xs text-[#707783] mt-0.5">Constellation Security Radar</div>
             </div>
           </div>
         </section>
@@ -437,19 +610,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         {/* ========================================================================= */}
         {/* INFINITE FRAMEWORKS MARQUEE */}
         {/* ========================================================================= */}
-        <section aria-label="Supported Technologies" className="overflow-hidden py-4 border-y border-[#1C2028] bg-[#0B0D11]/50 reveal-on-scroll">
+        <section aria-label="Supported Technologies" className="overflow-hidden py-4 border-y border-[#1C2028] bg-[#0B0D11]/60 reveal-on-scroll">
           <div className="flex items-center gap-4 text-xs font-medium text-[#707783]">
-            <span className="shrink-0 font-bold uppercase tracking-widest text-[#896EFF] text-[10px] pl-4">
-              Supported Ecosystem:
+            <span className="shrink-0 font-bold uppercase tracking-widest text-[#896EFF] text-[10px] pl-4 font-mono">
+              AST COMPATIBLE:
             </span>
             <div className="overflow-hidden w-full">
               <div className="animate-marquee flex items-center gap-8 text-[#9299A5]">
                 {frameworks.concat(frameworks).map((tech, idx) => (
                   <span
                     key={idx}
-                    className="flex items-center gap-2 hover:text-[#F5F6F8] transition-colors cursor-default whitespace-nowrap"
+                    className="flex items-center gap-2 hover:text-[#F5F6F8] transition-colors cursor-default whitespace-nowrap font-mono text-xs"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#48366F]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#7657FF]" />
                     {tech}
                   </span>
                 ))}
@@ -459,444 +632,535 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 2. INTERACTIVE PR SIMULATOR (Live Clickable Scenarios + Live Scan) */}
+        {/* 2. THE CENTERPIECE: NEURAL CROSS-BOUNDARY AST GRAPH (Interactive Laser Canvas) */}
         {/* ========================================================================= */}
-        <section id="live-simulator" className="space-y-6 scroll-mt-24 reveal-on-scroll">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
-              <Terminal className="w-3.5 h-3.5" />
-              <span>Interactive Verification Simulator</span>
+        <section id="interactive-ast-graph" className="space-y-6 scroll-mt-24 reveal-on-scroll">
+          <div className="text-center max-w-3xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider font-mono">
+              <Network className="w-3.5 h-3.5" />
+              <span>Interactive Compiler Traversal</span>
             </div>
-            <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
-              Test Real PR Regressions in the Browser
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#F5F6F8] tracking-tight">
+              Live Cross-Boundary AST Graph
             </h2>
             <p className="text-xs sm:text-sm text-[#9299A5]">
-              Click the scenarios, toggle between breaking diffs and auto-remediations, or click <strong>Run Live Scan</strong> to experience sub-45ms deterministic AST traversal.
+              Click the simulation buttons below to watch the live laser energy beam trace from FastAPI schemas to React JSX components in real time.
             </p>
           </div>
 
-          {/* Simulator Box */}
-          <div className="rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl overflow-hidden glow-purple">
-            {/* Top Bar with Tabs and Live Run Scan Button */}
-            <div className="bg-[#0B0D11] border-b border-[#252932] px-5 py-3.5 flex flex-wrap items-center justify-between gap-4">
+          {/* Interactive Graph Box */}
+          <div className="rounded-3xl bg-[#111318] border border-[#252932] shadow-2xl overflow-hidden glow-purple">
+            {/* Top Command Bar with Scenario Switches */}
+            <div className="bg-[#0B0D11] border-b border-[#252932] px-6 py-4 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-[#F04452]/80" />
-                  <div className="w-3 h-3 rounded-full bg-[#F59E0B]/80" />
-                  <div className="w-3 h-3 rounded-full bg-[#10B981]/80" />
+                  <div className="w-3 h-3 rounded-full bg-[#F04452]" />
+                  <div className="w-3 h-3 rounded-full bg-[#F59E0B]" />
+                  <div className="w-3 h-3 rounded-full bg-[#10B981]" />
                 </div>
-                <span className="text-xs font-mono text-[#9299A5]">
-                  PR #42 &bull; Myparadox-creator/REGRAVA
+                <span className="text-xs font-mono text-[#9299A5] flex items-center gap-2">
+                  <span>Graph Node Router</span>
+                  <span className="text-[#48366F]">•</span>
+                  <span className="text-[#10B981]">Active PR #42</span>
                 </span>
               </div>
 
-              {/* Action Controls & Simulator Tabs */}
+              {/* Simulation Mode Buttons */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* Mode Toggle: Diff vs Remediation */}
-                <div className="flex items-center bg-[#15181F] p-0.5 rounded-lg border border-[#252932] text-xs">
-                  <button
-                    onClick={() => setSimulatorMode('diff')}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                      simulatorMode === 'diff'
-                        ? 'bg-[#252932] text-[#F5F6F8]'
-                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                    }`}
-                  >
-                    Breaking Diff
-                  </button>
-                  <button
-                    onClick={() => setSimulatorMode('remediation')}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                      simulatorMode === 'remediation'
-                        ? 'bg-[#10B981]/20 text-[#10B981] font-semibold'
-                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                    }`}
-                  >
-                    Auto-Fix Patch
-                  </button>
-                </div>
-
-                {/* Scenario Tabs */}
-                <div className="flex items-center gap-1 bg-[#15181F] p-0.5 rounded-lg border border-[#252932] text-xs">
-                  <button
-                    onClick={() => {
-                      setActiveTab('contract');
-                      handleRunLiveScan();
-                    }}
-                    className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
-                      activeTab === 'contract'
-                        ? 'bg-[#7657FF] text-white shadow-sm'
-                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                    }`}
-                  >
-                    Contract Diff
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('sql');
-                      handleRunLiveScan();
-                    }}
-                    className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
-                      activeTab === 'sql'
-                        ? 'bg-[#7657FF] text-white shadow-sm'
-                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                    }`}
-                  >
-                    SQLi Taint
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('secrets');
-                      handleRunLiveScan();
-                    }}
-                    className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
-                      activeTab === 'secrets'
-                        ? 'bg-[#7657FF] text-white shadow-sm'
-                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                    }`}
-                  >
-                    Leaked Secret
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTab('tenancy');
-                      handleRunLiveScan();
-                    }}
-                    className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
-                      activeTab === 'tenancy'
-                        ? 'bg-[#7657FF] text-white shadow-sm'
-                        : 'text-[#9299A5] hover:text-[#F5F6F8]'
-                    }`}
-                  >
-                    Auth Tenancy
-                  </button>
-                </div>
-
-                {/* Live Scan Trigger Button */}
                 <button
-                  onClick={handleRunLiveScan}
-                  disabled={isScanning}
-                  className="px-3 py-1 rounded-lg bg-[#211A35] hover:bg-[#2e244d] border border-[#48366F] text-[#896EFF] text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
+                  onClick={() => setGraphScenario('broken')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${
+                    graphScenario === 'broken'
+                      ? 'bg-[#F04452] text-white shadow-lg shadow-red-950/50 scale-105'
+                      : 'bg-[#15181F] text-[#9299A5] hover:text-[#F5F6F8]'
+                  }`}
                 >
-                  {isScanning ? (
-                    <RefreshCw className="w-3 h-3 animate-spin text-[#896EFF]" />
-                  ) : (
-                    <Play className="w-3 h-3 text-[#896EFF] fill-current" />
-                  )}
-                  <span>{isScanning ? 'Analyzing AST...' : 'Run Live Scan'}</span>
+                  <span>💥 Trigger Breaking Schema</span>
+                </button>
+
+                <button
+                  onClick={() => setGraphScenario('healed')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${
+                    graphScenario === 'healed'
+                      ? 'bg-[#10B981] text-white shadow-lg shadow-emerald-950/50 scale-105'
+                      : 'bg-[#15181F] text-[#9299A5] hover:text-[#F5F6F8]'
+                  }`}
+                >
+                  <span>⚡ Auto-Heal & Synthesize Test</span>
+                </button>
+
+                <button
+                  onClick={() => setGraphScenario('sqli')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${
+                    graphScenario === 'sqli'
+                      ? 'bg-[#F59E0B] text-white shadow-lg shadow-amber-950/50 scale-105'
+                      : 'bg-[#15181F] text-[#9299A5] hover:text-[#F5F6F8]'
+                  }`}
+                >
+                  <span>🛡️ Test SQLi Taint Path</span>
+                </button>
+
+                <button
+                  onClick={() => setGraphScenario('secret')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${
+                    graphScenario === 'secret'
+                      ? 'bg-[#7657FF] text-white shadow-lg shadow-purple-950/50 scale-105'
+                      : 'bg-[#15181F] text-[#9299A5] hover:text-[#F5F6F8]'
+                  }`}
+                >
+                  <span>🔑 Leaked Secret Waveform</span>
                 </button>
               </div>
             </div>
 
-            {/* Scanning Progress Bar if scanning */}
-            {isScanning && (
-              <div className="bg-[#08090C] px-5 py-2 border-b border-[#252932] text-xs font-mono text-[#896EFF] flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Activity className="w-3.5 h-3.5 animate-pulse text-[#10B981]" />
-                  {scanStep === 0 && 'Phase 1: Generating Abstract Syntax Tree for app/schemas/user.py...'}
-                  {scanStep === 1 && 'Phase 2: Traversing 14 frontend TSX consumer components...'}
-                  {scanStep === 2 && 'Phase 3: Cross-boundary taint and interface verification...'}
-                  {scanStep === 3 && 'Scan Complete: 1 Critical Contract Break Found!'}
-                </span>
-                <span className="text-[10px] text-[#707783]">{scanStep * 33}%</span>
-              </div>
-            )}
+            {/* Visual SVG Laser Node Canvas */}
+            <div className="p-8 bg-[#08090C] relative min-h-[460px] flex flex-col justify-between overflow-hidden">
+              {/* Background Graph Grid */}
+              <div className="absolute inset-0 bg-grid-pattern opacity-40 pointer-events-none" />
 
-            {/* Scenario Content Pane */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[#252932] min-h-[420px]">
-              {/* Left Column: The PR Diff or Auto-Fix Patch */}
-              <div className="lg:col-span-5 p-5 space-y-3 font-mono text-xs bg-[#08090C]">
-                <div className="flex items-center justify-between text-[#707783] border-b border-[#1C2028] pb-2">
-                  <span className="flex items-center gap-1.5 text-xs text-[#D1D5DC]">
-                    <GitPullRequest className="w-3.5 h-3.5 text-[#896EFF]" />
-                    {simulatorMode === 'diff' ? (
-                      activeTab === 'contract'
-                        ? 'app/schemas/user.py'
-                        : activeTab === 'sql'
-                        ? 'app/db/repositories.py'
-                        : activeTab === 'secrets'
-                        ? 'config/payment_gateway.py'
-                        : 'app/routers/invoices.py'
-                    ) : (
-                      'frontend/src/components/UserProfile.tsx'
-                    )}
-                  </span>
-                  <span className="text-[11px] text-[#707783]">
-                    {simulatorMode === 'diff' ? '+12 -3 lines' : 'Auto-Remediated Fix'}
-                  </span>
-                </div>
+              {/* Dynamic SVG Laser Beams */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+                {/* Laser from Backend Schema to Central Sentinel Engine */}
+                <path
+                  d="M 230 140 C 340 140, 360 230, 480 230"
+                  fill="transparent"
+                  stroke={graphScenario === 'broken' ? '#F04452' : graphScenario === 'healed' ? '#10B981' : '#7657FF'}
+                  strokeWidth="3"
+                  className={graphScenario === 'broken' ? 'animate-laser-broken' : 'animate-laser'}
+                />
 
-                {simulatorMode === 'diff' ? (
-                  <>
-                    {activeTab === 'contract' && (
-                      <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                        <div className="text-[#707783]">@@ -18,6 +18,6 @@ class UserResponse(BaseModel):</div>
-                        <div className="text-[#D1D5DC]">     username: str</div>
-                        <div className="text-[#D1D5DC]">     email: EmailStr</div>
-                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                          -    user_id: int # Old primary key
-                        </div>
-                        <div className="bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded">
-                          +    id: int      # Renamed for OpenAPI consistency
-                        </div>
-                        <div className="text-[#D1D5DC]">     is_active: bool = True</div>
-                      </div>
-                    )}
+                {/* Laser from Central Sentinel Engine to React Frontend */}
+                <path
+                  d="M 640 230 C 740 230, 770 140, 880 140"
+                  fill="transparent"
+                  stroke={graphScenario === 'broken' ? '#F04452' : graphScenario === 'healed' ? '#10B981' : '#896EFF'}
+                  strokeWidth="3"
+                  className={graphScenario === 'broken' ? 'animate-laser-broken' : 'animate-laser'}
+                />
 
-                    {activeTab === 'sql' && (
-                      <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                        <div className="text-[#707783]">@@ -45,4 +45,4 @@ async def get_orders(client_query: str):</div>
-                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                          -    return await db.execute(select(Order).where(Order.id == order_id))
-                        </div>
-                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                          +    # Direct query string interpolation
-                        </div>
-                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                          {'+    raw_sql = f"SELECT * FROM orders WHERE status = \'{client_query}\'""'}
-                        </div>
-                        <div className="bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded">
-                          +    return await db.fetch_all(raw_sql)
-                        </div>
-                      </div>
-                    )}
+                {/* Laser from Central Sentinel Engine to Mobile iOS/Android Client */}
+                <path
+                  d="M 640 230 C 740 230, 770 340, 880 340"
+                  fill="transparent"
+                  stroke={graphScenario === 'broken' ? '#F04452' : graphScenario === 'healed' ? '#10B981' : '#896EFF'}
+                  strokeWidth="3"
+                  className={graphScenario === 'broken' ? 'animate-laser-broken' : 'animate-laser'}
+                />
+              </svg>
 
-                    {activeTab === 'secrets' && (
-                      <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                        <div className="text-[#707783]">@@ -8,3 +8,4 @@ class StripeConfig:</div>
-                        <div className="text-[#D1D5DC]">     API_VERSION = "2024-06-20"</div>
-                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                          +    TEST_WEBHOOK_SECRET = "demo_key_synthetic_high_entropy_token_xyz"
-                        </div>
-                      </div>
-                    )}
-
-                    {activeTab === 'tenancy' && (
-                      <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                        <div className="text-[#707783]">@@ -30,4 +30,4 @@ async def get_invoice(invoice_id: str):</div>
-                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                          -    # Checked current_user.tenant_id
-                        </div>
-                        <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                          {'+    return await db.invoices.find_one({"_id": invoice_id})'}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="space-y-1 leading-relaxed text-[#9299A5]">
-                    <div className="text-[#707783]">@@ -32,4 +32,4 @@ export function UserProfile({`{ data }`}: Props):</div>
-                    <div className="bg-[#F04452]/20 text-[#F04452] px-1.5 py-0.5 rounded">
-                      -  &lt;div className="id-badge"&gt;ID: {`{data.user_id}`}&lt;/div&gt;
-                    </div>
-                    <div className="bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded">
-                      +  &lt;div className="id-badge"&gt;ID: {`{data.id}`}&lt;/div&gt; // Auto-synced with schema
-                    </div>
-                    <div className="text-[#10B981] pt-3 text-[11px]">
-                      ✨ 1-Click Patch Generated: Safely resolves contract without broken UI!
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-4 border-t border-[#1C2028] text-[11px] text-[#707783]">
-                  💡 Notice: The backend code compiles and passes local unit tests completely fine!
-                </div>
-              </div>
-
-              {/* Center Column: What Generic AI Reviewers Say */}
-              <div className="lg:col-span-3 p-5 space-y-3 bg-[#0B0D11]/60">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#9299A5]">
-                  <XCircle className="w-4 h-4 text-[#F59E0B]" />
-                  <span>Generic AI Reviewer (CodeRabbit/Copilot)</span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#15181F] border border-[#252932] space-y-2 text-xs">
-                  <div className="flex items-center gap-1.5 text-[#10B981] font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>LGTM! Clean refactor 🟢</span>
-                  </div>
-                  <p className="text-[11px] text-[#9299A5] leading-relaxed">
-                    {activeTab === 'contract' &&
-                      '"The rename of `user_id` to `id` improves adherence to REST conventions. Variable naming is concise. Approved."'}
-                    {activeTab === 'sql' &&
-                      '"Refactored query execution to use fetch_all. Remember to keep functions small. Approved."'}
-                    {activeTab === 'secrets' &&
-                      '"Consider placing constants in environment configuration files for better maintainability."'}
-                    {activeTab === 'tenancy' &&
-                      '"Simplified invoice query handler. Looks good!"'}
-                  </p>
-                  <div className="text-[10px] text-[#F04452] font-mono pt-1">
-                    ⚠️ Missed: Zero cross-boundary correlation or syntax-tree taint tracking!
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: What REGRAVA Catches */}
-              <div className="lg:col-span-4 p-5 space-y-3 bg-[#111318]">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold text-[#F5F6F8]">
-                    <ShieldCheck className="w-4 h-4 text-[#896EFF]" />
-                    <span>REGRAVA Deterministic Sentinel</span>
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#211A35] text-[#896EFF] border border-[#48366F]">
-                    Caught in 38ms
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#08090C] border border-[#F04452]/40 space-y-2.5 text-xs">
-                  <div className="flex items-center gap-1.5 text-[#F04452] font-bold">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>
-                      {activeTab === 'contract' && 'CRITICAL: Broken Frontend Contract'}
-                      {activeTab === 'sql' && 'HIGH SEVERITY: SQL Injection AST Taint'}
-                      {activeTab === 'secrets' && 'BLOCKING: Live Production Secret'}
-                      {activeTab === 'tenancy' && 'CRITICAL: IDOR Multi-Tenancy Bypass'}
+              {/* Interactive Node Layout */}
+              <div className="relative z-20 grid grid-cols-1 md:grid-cols-3 gap-8 items-center h-full">
+                {/* Node 1: Backend Endpoint & Pydantic Schema */}
+                <div
+                  onClick={() => setActiveAstNode('fastapi')}
+                  className={`p-5 rounded-2xl glass-obsidian space-y-3 cursor-pointer transition-all ${
+                    activeAstNode === 'fastapi' ? 'border-[#7657FF] glow-purple' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="flex items-center gap-1.5 text-[#F5F6F8] font-bold">
+                      <Code2 className="w-4 h-4 text-[#896EFF]" />
+                      <span>FastAPI Pydantic AST</span>
                     </span>
+                    <span className="text-[10px] text-[#707783]">app/schemas/user.py</span>
                   </div>
 
-                  <div className="text-[11px] text-[#D1D5DC] space-y-1 font-mono">
-                    {activeTab === 'contract' && (
-                      <>
-                        <div className="text-[#9299A5]">Consumer Affected:</div>
-                        <div className="text-[#896EFF] bg-[#15181F] p-1.5 rounded">
-                          frontend/src/components/UserProfile.tsx:34
-                        </div>
-                        <div className="text-[#F04452] text-[10px] pt-1">
-                          💥 Component accesses `data.user_id` which no longer exists!
-                        </div>
-                      </>
-                    )}
-                    {activeTab === 'sql' && (
-                      <>
-                        <div className="text-[#9299A5]">AST Taint Chain:</div>
-                        <div className="text-[#F04452] bg-[#15181F] p-1.5 rounded">
-                          client_query &rarr; f-string format &rarr; db.fetch_all
-                        </div>
-                      </>
-                    )}
-                    {activeTab === 'secrets' && (
-                      <>
-                        <div className="text-[#9299A5]">Entropy Pattern Match:</div>
-                        <div className="text-[#F04452] bg-[#15181F] p-1.5 rounded">
-                          Stripe Live Key (Entropy: 4.82)
-                        </div>
-                      </>
-                    )}
-                    {activeTab === 'tenancy' && (
-                      <>
-                        <div className="text-[#9299A5]">Missing Tenant Boundary:</div>
-                        <div className="text-[#F04452] bg-[#15181F] p-1.5 rounded">
-                          Missing `tenant_id` filter in DB lookup
-                        </div>
-                      </>
+                  <div className="p-3 rounded-xl bg-[#0B0D11] font-mono text-[11px] space-y-1">
+                    <div className="text-[#707783]">class UserResponse(BaseModel):</div>
+                    <div className="text-[#D1D5DC]">  username: str</div>
+                    {graphScenario === 'broken' ? (
+                      <div className="bg-[#F04452]/20 text-[#F04452] px-1 py-0.5 rounded font-bold">
+                        - user_id: int &rarr; + id: int
+                      </div>
+                    ) : graphScenario === 'healed' ? (
+                      <div className="bg-[#10B981]/20 text-[#10B981] px-1 py-0.5 rounded font-bold">
+                        + id: int (Auto-Synced with client)
+                      </div>
+                    ) : (
+                      <div className="text-[#D1D5DC]">  user_id: int</div>
                     )}
                   </div>
 
-                  {/* Auto-Generated Proof */}
-                  <div className="pt-2 border-t border-[#252932] space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px] text-[#10B981]">
-                      <span className="font-semibold flex items-center gap-1">
-                        <CheckCheck className="w-3 h-3" /> Auto-Generated Test Proof
-                      </span>
-                      <button
-                        onClick={() =>
-                          copyToClipboard(
-                            `// Vitest Contract Regression Test\nit('should verify /api/users returns id', async () => {\n  const res = await api.get('/users/me');\n  expect(res.data).toHaveProperty('id');\n});`
-                          )
-                        }
-                        className="hover:underline flex items-center gap-1 text-[#896EFF]"
-                      >
-                        {copiedTest ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        <span>{copiedTest ? 'Copied' : 'Copy Test'}</span>
-                      </button>
-                    </div>
-                    <pre className="text-[10px] bg-[#15181F] p-2 rounded text-[#9299A5] overflow-x-auto">
-                      {`it('should verify /api/users returns id', async () => {
-  const res = await api.get('/users/me');
-  expect(res.data).toHaveProperty('id');
-});`}
-                    </pre>
+                  <div className="text-[10px] text-[#707783] flex items-center justify-between">
+                    <span>Parsed: 9.4ms</span>
+                    <span className="text-[#10B981] font-bold">Node ID #1842</span>
                   </div>
                 </div>
+
+                {/* Node 2: Central Sentinel Deterministic Router */}
+                <div className="p-6 rounded-2xl bg-gradient-to-b from-[#15181F] to-[#111318] border-2 border-[#48366F] text-center space-y-3 shadow-2xl relative glow-purple">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-[#211A35] border border-[#48366F] flex items-center justify-center text-[#896EFF] shadow-lg shadow-purple-950/60">
+                    <Zap className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-extrabold text-[#F5F6F8]">REGRAVA AST Engine</div>
+                    <div className="text-[10px] font-mono text-[#896EFF]">Cross-Boundary AST Correlator</div>
+                  </div>
+
+                  {graphScenario === 'broken' && (
+                    <div className="p-2.5 rounded-xl bg-[#F04452]/15 border border-[#F04452]/40 text-left space-y-1">
+                      <div className="text-[11px] font-bold text-[#F04452] flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>BREAKING CHANGE CAUGHT</span>
+                      </div>
+                      <div className="text-[10px] text-[#D1D5DC] font-mono">
+                        Field "user_id" missing in 2 consumers.
+                      </div>
+                    </div>
+                  )}
+
+                  {graphScenario === 'healed' && (
+                    <div className="p-2.5 rounded-xl bg-[#10B981]/15 border border-[#10B981]/40 text-left space-y-1">
+                      <div className="text-[11px] font-bold text-[#10B981] flex items-center gap-1">
+                        <CheckCheck className="w-3.5 h-3.5" />
+                        <span>REMEDIATED & VERIFIED</span>
+                      </div>
+                      <div className="text-[10px] text-[#D1D5DC] font-mono">
+                        Vitest contract assertion locked.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="text-[10px] font-mono text-[#707783] pt-1">
+                    Traversal Time: <span className="text-[#F5F6F8] font-bold">16.2ms</span>
+                  </div>
+                </div>
+
+                {/* Node 3: React JSX + Mobile Consumers */}
+                <div className="space-y-4">
+                  {/* React Consumer */}
+                  <div
+                    onClick={() => setActiveAstNode('react')}
+                    className={`p-4 rounded-xl glass-obsidian space-y-2 cursor-pointer transition-all ${
+                      activeAstNode === 'react' ? 'border-[#896EFF]' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-[#F5F6F8] font-bold flex items-center gap-1.5">
+                        <Code2 className="w-3.5 h-3.5 text-[#10B981]" />
+                        <span>React TSX Component</span>
+                      </span>
+                      <span className="text-[10px] text-[#707783]">UserProfile.tsx:34</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-[#0B0D11] font-mono text-[10px]">
+                      {graphScenario === 'broken' ? (
+                        <div className="text-[#F04452]">
+                          💥 &lt;Avatar id={'{data.user_id}'} /&gt; (UNDEFINED)
+                        </div>
+                      ) : (
+                        <div className="text-[#10B981]">
+                          ✓ &lt;Avatar id={'{data.id}'} /&gt; (ALIGNED)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mobile Consumer */}
+                  <div className="p-4 rounded-xl glass-obsidian space-y-2">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-[#F5F6F8] font-bold">Mobile iOS Client</span>
+                      <span className="text-[10px] text-[#707783]">MobileClient.ts:88</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-[#0B0D11] font-mono text-[10px]">
+                      {graphScenario === 'broken' ? (
+                        <div className="text-[#F04452]">
+                          💥 user.userId &rarr; nil pointer reference
+                        </div>
+                      ) : (
+                        <div className="text-[#10B981]">
+                          ✓ user.id &rarr; Validated
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Test Proof Strip */}
+              <div className="relative z-20 mt-6 pt-4 border-t border-[#1C2028] flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <span className="text-[#10B981] font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Auto-Synthesized Proof:
+                  </span>
+                  <code className="text-[11px] bg-[#111318] px-2 py-1 rounded text-[#9299A5] border border-[#252932]">
+                    test_contract_pr42.spec.ts (Vitest)
+                  </code>
+                </div>
+
+                <button
+                  onClick={() =>
+                    copyToClipboard(
+                      `// REGRAVA Auto-Generated Vitest Contract Proof\nimport { describe, it, expect } from 'vitest';\nimport api from '../client';\n\ndescribe('Contract Verification PR #42', () => {\n  it('guarantees /api/v1/users contains id without schema mismatch', async () => {\n    const res = await api.get('/users/me');\n    expect(res.data).toHaveProperty('id');\n    expect(res.data.id).toBeTypeOf('number');\n  });\n});`,
+                      'proof'
+                    )
+                  }
+                  className="px-3 py-1 rounded-lg bg-[#211A35] hover:bg-[#2e244d] border border-[#48366F] text-[#896EFF] text-xs font-bold flex items-center gap-1.5 transition-all"
+                >
+                  {copiedTestProof ? <Check className="w-3 h-3 text-[#10B981]" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedTestProof ? 'Copied Assertion!' : 'Copy Vitest Assertion'}</span>
+                </button>
               </div>
             </div>
           </div>
         </section>
 
         {/* ========================================================================= */}
-        {/* 3. THE WEDGE & ARCHITECTURAL MOAT */}
+        {/* 3. IN-BROWSER HACKER CLI TERMINAL SIMULATOR */}
         {/* ========================================================================= */}
-        <section id="wedge" className="space-y-10 scroll-mt-24 reveal-on-scroll">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5" />
-              <span>Architectural Moat</span>
+        <section id="cli-terminal" className="space-y-6 scroll-mt-24 reveal-on-scroll">
+          <div className="text-center max-w-3xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#10B981] uppercase tracking-wider font-mono">
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Interactive CLI Telemetry</span>
             </div>
-            <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
-              Why Stochastic AI Can Never Solve This
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#F5F6F8] tracking-tight">
+              In-Browser Terminal Simulator
             </h2>
             <p className="text-xs sm:text-sm text-[#9299A5]">
-              LLMs predict the most statistically probable next word. They cannot traverse polyglot AST dependency graphs across repository boundaries.
+              Click the commands below to execute live simulated CI scans and witness memory buffer zeroing.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all hover:scale-[1.01]">
-              <div className="w-10 h-10 rounded-xl bg-[#211A35] border border-[#48366F] flex items-center justify-center text-[#896EFF]">
-                <Cpu className="w-5 h-5" />
+          <div className="rounded-3xl bg-[#0B0D11] border border-[#252932] shadow-2xl overflow-hidden glow-purple">
+            {/* Terminal Header */}
+            <div className="bg-[#111318] px-5 py-3 border-b border-[#252932] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#F04452]" />
+                <div className="w-3 h-3 rounded-full bg-[#F59E0B]" />
+                <div className="w-3 h-3 rounded-full bg-[#10B981]" />
+                <span className="text-xs font-mono text-[#707783] ml-2">bash - regrava@sentinel: ~</span>
               </div>
-              <h3 className="text-base font-bold text-[#F5F6F8]">Deterministic AST vs. Prompt Wrappers</h3>
-              <p className="text-xs text-[#9299A5] leading-relaxed">
-                We construct real Abstract Syntax Trees (ASTs) of backend Pydantic/Go models and correlate them with frontend TypeScript/JSX component trees. No hallucinations. 100% mathematical precision.
-              </p>
+              <div className="flex items-center gap-2 text-[10px] font-mono text-[#896EFF]">
+                <span className="w-2 h-2 rounded-full bg-[#896EFF] animate-pulse" />
+                <span>EPHEMERAL RAM ACTIVE</span>
+              </div>
             </div>
 
-            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all hover:scale-[1.01]">
-              <div className="w-10 h-10 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 flex items-center justify-center text-[#10B981]">
-                <Lock className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-[#F5F6F8]">100% Zero-Retention Security</h3>
-              <p className="text-xs text-[#9299A5] leading-relaxed">
-                Analysis executes ephemerally in RAM and is discarded instantly. Your proprietary source code is never used to train models or sent to third-party cloud LLMs. Passes SOC2 and HIPAA audits.
-              </p>
+            {/* Quick Interactive Command Buttons */}
+            <div className="p-3 bg-[#15181F]/70 border-b border-[#252932] flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-mono text-[#707783] mr-2">Quick Run:</span>
+              <button
+                onClick={() => runTerminalCommand('regrava scan --pr 42 --cross-repo')}
+                disabled={terminalExecuting}
+                className="px-2.5 py-1 rounded bg-[#211A35] hover:bg-[#2d234a] border border-[#48366F] text-[11px] font-mono text-[#896EFF] transition-all disabled:opacity-50"
+              >
+                ▶ regrava scan --pr 42
+              </button>
+              <button
+                onClick={() => runTerminalCommand('regrava check:taint --ast-deep')}
+                disabled={terminalExecuting}
+                className="px-2.5 py-1 rounded bg-[#111318] hover:bg-[#1B1F27] border border-[#252932] text-[11px] font-mono text-[#D1D5DC] transition-all disabled:opacity-50"
+              >
+                ▶ regrava check:taint
+              </button>
+              <button
+                onClick={() => runTerminalCommand('regrava memory:wipe --verify')}
+                disabled={terminalExecuting}
+                className="px-2.5 py-1 rounded bg-[#111318] hover:bg-[#1B1F27] border border-[#252932] text-[11px] font-mono text-[#D1D5DC] transition-all disabled:opacity-50"
+              >
+                ▶ regrava memory:wipe
+              </button>
+              <button
+                onClick={() => runTerminalCommand('regrava fleet:audit --all')}
+                disabled={terminalExecuting}
+                className="px-2.5 py-1 rounded bg-[#111318] hover:bg-[#1B1F27] border border-[#252932] text-[11px] font-mono text-[#D1D5DC] transition-all disabled:opacity-50"
+              >
+                ▶ regrava fleet:audit
+              </button>
             </div>
 
-            <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 hover:border-[#48366F] transition-all hover:scale-[1.01]">
-              <div className="w-10 h-10 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 flex items-center justify-center text-[#F59E0B]">
-                <Code2 className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-[#F5F6F8]">Automated Test Proofs, Not Opinions</h3>
-              <p className="text-xs text-[#9299A5] leading-relaxed">
-                When a contract breaks or a security trap is detected, REGRAVA doesn’t just complain—it generates ready-to-run pytest and Vitest assertions to verify and lock in the fix permanently.
-              </p>
+            {/* Terminal Body Screen */}
+            <div className="p-6 font-mono text-xs space-y-1.5 min-h-[300px] max-h-[420px] overflow-y-auto scanlines bg-[#08090C]">
+              {terminalLog.map((line, idx) => (
+                <div
+                  key={idx}
+                  className={`leading-relaxed ${
+                    line.startsWith('$')
+                      ? 'text-[#F5F6F8] font-bold'
+                      : line.includes('CRITICAL') || line.includes('VIOLATION')
+                      ? 'text-[#F04452] font-semibold'
+                      : line.includes('✓') || line.includes('✨')
+                      ? 'text-[#10B981]'
+                      : 'text-[#9299A5]'
+                  }`}
+                >
+                  {line}
+                </div>
+              ))}
+              {terminalExecuting && (
+                <div className="text-[#896EFF] animate-pulse flex items-center gap-2">
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  <span>Computing AST node intersections...</span>
+                </div>
+              )}
             </div>
           </div>
         </section>
 
         {/* ========================================================================= */}
-        {/* 4. THE 7-LAYER FLEET SECURITY POSTURE (Interactive Scorecard) */}
+        {/* 4. HEAD-TO-HEAD ARENA: STOCHASTIC LLM VS DETERMINISTIC AST */}
         {/* ========================================================================= */}
-        <section id="seven-pillars" className="space-y-10 scroll-mt-24 reveal-on-scroll">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
-              <Layers className="w-3.5 h-3.5" />
-              <span>Full-Stack Security Radar</span>
+        <section id="head-to-head" className="space-y-8 scroll-mt-24 reveal-on-scroll">
+          <div className="text-center max-w-3xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider font-mono">
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Architectural Battle</span>
             </div>
-            <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
-              7-Layer Deterministic Fleet Scorecard
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#F5F6F8] tracking-tight">
+              Stochastic LLM vs. Deterministic AST
+            </h2>
+            <p className="text-xs sm:text-sm text-[#9299A5]">
+              Toggle between the two engines to understand why pure prompt wrappers fail at full-stack contract reliability.
+            </p>
+          </div>
+
+          <div className="flex justify-center">
+            <div className="inline-flex p-1 rounded-xl bg-[#111318] border border-[#252932]">
+              <button
+                onClick={() => setArenaMode('deterministic')}
+                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+                  arenaMode === 'deterministic'
+                    ? 'bg-[#7657FF] text-white shadow-md'
+                    : 'text-[#9299A5] hover:text-[#F5F6F8]'
+                }`}
+              >
+                REGRAVA Deterministic AST
+              </button>
+              <button
+                onClick={() => setArenaMode('stochastic')}
+                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+                  arenaMode === 'stochastic'
+                    ? 'bg-[#F04452] text-white shadow-md'
+                    : 'text-[#9299A5] hover:text-[#F5F6F8]'
+                }`}
+              >
+                Generic AI (CodeRabbit / Copilot)
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Deterministic Card */}
+            <div
+              className={`p-7 rounded-3xl border transition-all ${
+                arenaMode === 'deterministic'
+                  ? 'bg-[#111318] border-[#7657FF] shadow-2xl glow-purple scale-[1.01]'
+                  : 'bg-[#0B0D11]/60 border-[#1C2028] opacity-60'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold font-mono text-[#896EFF] uppercase tracking-wider">
+                  REGRAVA Engine
+                </span>
+                <span className="px-2 py-0.5 rounded bg-[#10B981]/20 text-[#10B981] text-[10px] font-bold">
+                  MATHEMATICAL PROOF
+                </span>
+              </div>
+              <h3 className="text-xl font-extrabold text-[#F5F6F8] mt-3">Deterministic Syntax Graph</h3>
+
+              <ul className="space-y-3 mt-5 text-xs text-[#9299A5]">
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>&lt; 35ms scan speed:</strong> Executes within normal Git pre-commit and PR webhooks without blocking merges.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Zero False Positives:</strong> Flags only verified compiler nodes, missing variables, and concrete breaking contracts.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Ephemeral In-Memory Sandbox:</strong> Code is processed in RAM and destroyed. 0 bytes persisted, passes SOC2/HIPAA.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Auto-Synthesizes Proofs:</strong> Delivers working Vitest assertions and AST patches, not conversation.
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Stochastic Card */}
+            <div
+              className={`p-7 rounded-3xl border transition-all ${
+                arenaMode === 'stochastic'
+                  ? 'bg-[#111318] border-[#F04452] shadow-2xl scale-[1.01]'
+                  : 'bg-[#0B0D11]/60 border-[#1C2028] opacity-60'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold font-mono text-[#F04452] uppercase tracking-wider">
+                  Generic Prompt Wrapper
+                </span>
+                <span className="px-2 py-0.5 rounded bg-[#F04452]/20 text-[#F04452] text-[10px] font-bold">
+                  PROBABILISTIC NEXT-TOKEN
+                </span>
+              </div>
+              <h3 className="text-xl font-extrabold text-[#F5F6F8] mt-3">Probabilistic LLM Wrapper</h3>
+
+              <ul className="space-y-3 mt-5 text-xs text-[#9299A5]">
+                <li className="flex items-start gap-2.5">
+                  <XCircle className="w-4 h-4 text-[#F04452] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Alert Fatigue & Noise:</strong> Floods PRs with 15-20 cosmetic markdown comments ("consider renaming x").
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <XCircle className="w-4 h-4 text-[#F04452] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Blind to Cross-Boundary Diff:</strong> Reviews single files in silos; misses when a Python change breaks React TSX.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <XCircle className="w-4 h-4 text-[#F04452] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Cloud Data Exposure:</strong> Transmits intellectual property and source code to third-party AI APIs.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <XCircle className="w-4 h-4 text-[#F04452] shrink-0 mt-0.5" />
+                  <span>
+                    <strong>High Token Latency:</strong> Multi-file reviews take 45–90+ seconds, disrupting fast deployment cadences.
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 5. 7-LAYER CONSTELLATION RADAR & LIVE FLEET HEALTH */}
+        {/* ========================================================================= */}
+        <section id="constellation" className="space-y-10 scroll-mt-24 reveal-on-scroll">
+          <div className="text-center max-w-3xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider font-mono">
+              <Layers className="w-3.5 h-3.5" />
+              <span>Full-Stack Constellation</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#F5F6F8] tracking-tight">
+              7-Layer Deterministic Fleet Radar
             </h2>
             <p className="text-xs sm:text-sm text-[#9299A5]">
               Click on the warning layers below to simulate automated auto-remediation and watch the live Fleet Health Score climb to 100%!
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-            {/* Left: Dynamic Live Health Gauge */}
-            <div className="lg:col-span-4 p-7 rounded-2xl bg-[#111318] border border-[#252932] text-center space-y-4 shadow-xl">
-              <div className="text-xs font-bold uppercase tracking-wider text-[#9299A5]">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Live SVG Fleet Health Meter */}
+            <div className="lg:col-span-4 p-8 rounded-3xl glass-obsidian text-center space-y-5 shadow-2xl">
+              <div className="text-xs font-mono font-bold uppercase tracking-wider text-[#896EFF]">
                 Simulated Fleet Posture
               </div>
-              <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
+
+              <div className="relative w-40 h-40 mx-auto flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                   <circle
                     cx="50"
@@ -910,75 +1174,78 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     cx="50"
                     cy="50"
                     r="40"
-                    stroke={calculatedHealthScore >= 85 ? '#10B981' : '#F59E0B'}
+                    stroke={fleetScore >= 85 ? '#10B981' : '#F59E0B'}
                     strokeWidth="8"
                     strokeDasharray={251.2}
-                    strokeDashoffset={251.2 - (251.2 * calculatedHealthScore) / 100}
+                    strokeDashoffset={251.2 - (251.2 * fleetScore) / 100}
                     strokeLinecap="round"
                     fill="transparent"
                     className="transition-all duration-700 ease-out"
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-extrabold text-[#F5F6F8]">
-                    {calculatedHealthScore}%
+                  <span className="text-4xl font-black text-[#F5F6F8] font-mono">
+                    {fleetScore}%
                   </span>
-                  <span className="text-[10px] text-[#707783] uppercase tracking-wide">
-                    {calculatedHealthScore >= 85 ? 'Healthy' : 'Needs Fix'}
+                  <span className="text-[10px] text-[#707783] uppercase tracking-wide font-mono mt-1">
+                    {fleetScore >= 85 ? 'HEALED' : 'THREATS CAUGHT'}
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-[#9299A5]">
-                {calculatedHealthScore === 100
-                  ? '✨ All 7 Deterministic Layers Verified! Ready for production deployment.'
-                  : '⚠️ 2 potential contract and tenancy regressions detected in active PR branches.'}
+
+              <p className="text-xs text-[#9299A5] leading-relaxed">
+                {fleetScore === 100
+                  ? '✨ All 7 deterministic AST layers are 100% clean. Zero breaking contract regressions.'
+                  : '⚠️ 2 unresolved contract and tenancy regressions detected in active PR branches.'}
               </p>
+
               <button
                 onClick={() => {
                   setLayers((prev) =>
-                    prev.map((l) => ({ ...l, status: 'passed' }))
+                    prev.map((l) => ({ ...l, status: 'clean' }))
                   );
                 }}
-                className="w-full py-2 px-3 rounded-lg bg-[#211A35] hover:bg-[#2e244d] border border-[#48366F] text-xs font-semibold text-[#896EFF] transition-colors"
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#7657FF] to-[#896EFF] hover:brightness-110 text-white font-bold text-xs shadow-md transition-all font-mono"
               >
-                Auto-Fix All 7 Layers
+                Auto-Heal All 7 Layers
               </button>
             </div>
 
-            {/* Right: The 7 Clickable Layer Cards */}
+            {/* 7 Clickable Interactive Layers */}
             <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               {layers.map((layer) => (
                 <div
                   key={layer.id}
-                  onClick={() => handleToggleLayerFix(layer.id)}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
-                    layer.status === 'passed' || layer.status === 'fixed'
+                  onClick={() => handleToggleLayer(layer.id)}
+                  className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                    layer.status === 'clean' || layer.status === 'remediated'
                       ? 'bg-[#111318] border-[#252932] hover:border-[#10B981]/50'
                       : 'bg-[#15181F] border-[#F59E0B]/50 hover:border-[#F59E0B]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#F5F6F8] flex items-center gap-1.5">
-                      {layer.status === 'passed' || layer.status === 'fixed' ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+                    <span className="text-xs font-bold text-[#F5F6F8] flex items-center gap-2">
+                      {layer.status === 'clean' || layer.status === 'remediated' ? (
+                        <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
                       ) : (
-                        <AlertTriangle className="w-3.5 h-3.5 text-[#F59E0B]" />
+                        <AlertTriangle className="w-4 h-4 text-[#F59E0B]" />
                       )}
                       <span>{layer.name}</span>
                     </span>
                     <span
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded ${
-                        layer.status === 'passed' || layer.status === 'fixed'
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                        layer.status === 'clean' || layer.status === 'remediated'
                           ? 'bg-[#10B981]/15 text-[#10B981]'
                           : 'bg-[#F59E0B]/15 text-[#F59E0B]'
                       }`}
                     >
-                      {layer.status === 'passed' ? 'Clean' : layer.status === 'fixed' ? 'Fixed ✓' : 'Action Req'}
+                      {layer.status === 'clean' ? 'Passed' : layer.status === 'remediated' ? 'Healed ✓' : 'Action Req'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-[#707783] mt-1.5 leading-relaxed">
-                    {layer.desc}
-                  </p>
+                  <div className="flex items-center justify-between text-[11px] text-[#707783] mt-2 font-mono">
+                    <span>{layer.category}</span>
+                    <span>{layer.runtimeLatency}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -986,186 +1253,147 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 5. COMPETITIVE COMPARISON MATRIX */}
+        {/* 6. FINANCIAL ROI & TEAM VELOCITY SIMULATOR */}
         {/* ========================================================================= */}
-        <section id="comparison" className="space-y-8 scroll-mt-24 reveal-on-scroll">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Competitive Landscape</span>
-            </div>
-            <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
-              Deterministic Certainty vs. Stochastic AI
-            </h2>
-            <p className="text-xs sm:text-sm text-[#9299A5]">
-              Why high-velocity engineering teams choose REGRAVA over generic AI PR summary bots.
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-[#111318] border border-[#252932] overflow-x-auto shadow-2xl">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#0B0D11] border-b border-[#252932] text-[#F5F6F8]">
-                <tr>
-                  <th className="py-4 px-5 font-semibold">Capability</th>
-                  <th className="py-4 px-5 font-bold text-[#896EFF] bg-[#211A35]/30">REGRAVA (Deterministic Sentinel)</th>
-                  <th className="py-4 px-5 font-semibold text-[#9299A5]">CodeRabbit / Copilot</th>
-                  <th className="py-4 px-5 font-semibold text-[#9299A5]">Traditional SAST (SonarQube)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#1C2028]">
-                <tr>
-                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Cross-Boundary Contract Tracing</td>
-                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Full-Stack AST Graph
-                  </td>
-                  <td className="py-3.5 px-5 text-[#F04452]">❌ Single-repo prompt blind</td>
-                  <td className="py-3.5 px-5 text-[#F04452]">❌ Disconnected silos</td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Hallucination & Alert Fatigue</td>
-                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> 0% (Mathematical syntax tree)
-                  </td>
-                  <td className="py-3.5 px-5 text-[#F59E0B]">⚠️ High (15-20 cosmetic comments)</td>
-                  <td className="py-3.5 px-5 text-[#F59E0B]">⚠️ High (Hundreds of style warnings)</td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Scan Latency</td>
-                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> &lt; 45ms per PR
-                  </td>
-                  <td className="py-3.5 px-5 text-[#9299A5]">30s – 2 minutes</td>
-                  <td className="py-3.5 px-5 text-[#9299A5]">2 – 10 minutes</td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Enterprise Code Privacy</td>
-                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> 100% In-Memory Zero Retention
-                  </td>
-                  <td className="py-3.5 px-5 text-[#F59E0B]">⚠️ Third-party cloud LLM API</td>
-                  <td className="py-3.5 px-5 text-[#10B981]">On-prem license</td>
-                </tr>
-                <tr>
-                  <td className="py-3.5 px-5 font-medium text-[#F5F6F8]">Actionable Remediation</td>
-                  <td className="py-3.5 px-5 text-[#10B981] font-bold bg-[#211A35]/20 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> AST Code Patch + Auto-Generated Test
-                  </td>
-                  <td className="py-3.5 px-5 text-[#9299A5]">Conversational text advice</td>
-                  <td className="py-3.5 px-5 text-[#9299A5]">Rule IDs & code smells</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* ========================================================================= */}
-        {/* 6. INTERACTIVE ROI CALCULATOR */}
-        {/* ========================================================================= */}
-        <section id="roi" className="space-y-8 scroll-mt-24 reveal-on-scroll">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
+        <section id="roi-engine" className="space-y-8 scroll-mt-24 reveal-on-scroll">
+          <div className="text-center max-w-3xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#10B981] uppercase tracking-wider font-mono">
               <Users className="w-3.5 h-3.5" />
-              <span>Interactive ROI Calculator</span>
+              <span>Financial Economics</span>
             </div>
-            <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
-              Quantify Your Team's Saved Engineering Hours
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#F5F6F8] tracking-tight">
+              Engineering Velocity & ROI Engine
             </h2>
             <p className="text-xs sm:text-sm text-[#9299A5]">
-              Adjust your engineering team size to estimate monthly savings and outage prevention with REGRAVA.
+              Quantify the exact dollar return of preventing breaking changes and automating manual PR review cycles.
             </p>
           </div>
 
-          <div className="max-w-3xl mx-auto p-6 sm:p-8 rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl space-y-6">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-[#F5F6F8] flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-[#896EFF]" />
-                  Engineers Shipping Code:
-                </span>
-                <span className="font-bold text-[#896EFF] text-base px-3 py-1 rounded-lg bg-[#211A35] border border-[#48366F]">
-                  {teamSize} Developers
-                </span>
+          <div className="max-w-4xl mx-auto p-8 rounded-3xl glass-obsidian space-y-8 shadow-2xl">
+            {/* Dual Interactive Sliders */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-[#F5F6F8] flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-[#896EFF]" />
+                    Engineers Shipping Code:
+                  </span>
+                  <span className="font-bold text-[#896EFF] font-mono text-sm px-3 py-1 rounded-lg bg-[#211A35] border border-[#48366F]">
+                    {teamSize} Devs
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="150"
+                  step="5"
+                  value={teamSize}
+                  onChange={(e) => setTeamSize(Number(e.target.value))}
+                  className="w-full accent-[#7657FF] cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-[#707783] font-mono">
+                  <span>5 (Startup)</span>
+                  <span>50 (Growth)</span>
+                  <span>150+ (Enterprise)</span>
+                </div>
               </div>
-              <input
-                type="range"
-                min="5"
-                max="100"
-                step="5"
-                value={teamSize}
-                onChange={(e) => setTeamSize(Number(e.target.value))}
-                className="w-full accent-[#7657FF] cursor-pointer"
-              />
-              <div className="flex justify-between text-[11px] text-[#707783]">
-                <span>5 Devs (Early Startup)</span>
-                <span>50 Devs (Scaleup)</span>
-                <span>100+ Devs (Enterprise)</span>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-[#F5F6F8] flex items-center gap-2">
+                    <Flame className="w-4 h-4 text-[#10B981]" />
+                    Weekly PR Velocity:
+                  </span>
+                  <span className="font-bold text-[#10B981] font-mono text-sm px-3 py-1 rounded-lg bg-[#10B981]/15 border border-[#10B981]/30">
+                    {prWeeklyVelocity} PRs / wk
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="200"
+                  step="10"
+                  value={prWeeklyVelocity}
+                  onChange={(e) => setPrWeeklyVelocity(Number(e.target.value))}
+                  className="w-full accent-[#10B981] cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-[#707783] font-mono">
+                  <span>10 PRs</span>
+                  <span>100 PRs</span>
+                  <span>200+ PRs/wk</span>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-[#252932]">
-              <div className="p-4 rounded-xl bg-[#08090C] border border-[#1C2028]">
-                <div className="text-2xl font-extrabold text-[#F5F6F8]">{hoursSavedPerMonth} hrs</div>
-                <div className="text-xs text-[#707783] mt-1">Review Time Saved / Mo</div>
+            {/* Calculated Impact Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-[#252932]">
+              <div className="p-4 rounded-2xl bg-[#08090C] border border-[#1C2028]">
+                <div className="text-2xl font-black text-[#F5F6F8] font-mono">{hoursSavedMonthly} hrs</div>
+                <div className="text-[11px] text-[#707783] mt-1">Review Saved / Mo ({Math.round(totalPrsMonthly)} PRs)</div>
               </div>
-              <div className="p-4 rounded-xl bg-[#08090C] border border-[#1C2028]">
-                <div className="text-2xl font-extrabold text-[#10B981]">${dollarsSavedPerMonth.toLocaleString()}</div>
-                <div className="text-xs text-[#707783] mt-1">Engineering Salary Saved / Mo</div>
+              <div className="p-4 rounded-2xl bg-[#08090C] border border-[#1C2028]">
+                <div className="text-2xl font-black text-[#10B981] font-mono">
+                  ${dollarsSavedMonthly.toLocaleString()}
+                </div>
+                <div className="text-[11px] text-[#707783] mt-1">Direct Engineering Savings</div>
               </div>
-              <div className="p-4 rounded-xl bg-[#08090C] border border-[#1C2028]">
-                <div className="text-2xl font-extrabold text-[#896EFF]">~{outagesPreventedPerYear} Outages</div>
-                <div className="text-xs text-[#707783] mt-1">Contract Breaks Prevented / Yr</div>
+              <div className="p-4 rounded-2xl bg-[#08090C] border border-[#1C2028]">
+                <div className="text-2xl font-black text-[#896EFF] font-mono">
+                  ~{outagesPreventedYearly} Outages
+                </div>
+                <div className="text-[11px] text-[#707783] mt-1">Production Outages Averted</div>
+              </div>
+              <div className="p-4 rounded-2xl bg-[#08090C] border border-[#1C2028]">
+                <div className="text-2xl font-black text-[#F5F6F8] font-mono">{financialRoiMultiplier}x</div>
+                <div className="text-[11px] text-[#707783] mt-1">Annual Net ROI Ratio</div>
               </div>
             </div>
           </div>
         </section>
 
         {/* ========================================================================= */}
-        {/* 7. INTERACTIVE FAQ ACCORDION */}
+        {/* 7. TECHNICAL FAQ ACCORDION */}
         {/* ========================================================================= */}
         <section id="faq" className="space-y-8 scroll-mt-24 reveal-on-scroll">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
+          <div className="text-center max-w-3xl mx-auto space-y-2">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider font-mono">
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>Frequently Asked Questions</span>
+              <span>Architectural FAQ</span>
             </div>
-            <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
-              Everything You Need to Know
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-[#F5F6F8] tracking-tight">
+              Frequently Asked Questions
             </h2>
             <p className="text-xs sm:text-sm text-[#9299A5]">
-              Answers to technical architecture, privacy, compliance, and deployment questions.
+              Everything you need to know about deterministic parsing, zero-retention compliance, and deployment.
             </p>
           </div>
 
           <div className="max-w-3xl mx-auto space-y-3">
             {[
               {
-                q: 'How is REGRAVA different from CodeRabbit or GitHub Copilot?',
-                a: 'CodeRabbit and Copilot rely entirely on LLM prompts to review code. They treat source code as natural text and suffer from hallucinations, cosmetic comment spam, and prompt-context size limits. REGRAVA constructs real Abstract Syntax Trees (ASTs) to mathematically track backend API models directly to their frontend TSX consumer components in < 45ms with 0% hallucinations.',
+                q: 'How is REGRAVA different from CodeRabbit, Qodo, or GitHub Copilot?',
+                a: 'CodeRabbit and Copilot treat source code as natural language text prompts sent to cloud LLMs. They suffer from hallucinations, high token latency (45-90s), and zero cross-repo awareness. REGRAVA constructs real Abstract Syntax Trees (ASTs) of backend models and traverses directly to React JSX consumers in < 35ms with 0% hallucinations and zero cloud retention.',
               },
               {
-                q: 'Does any of our proprietary source code get stored or used for AI training?',
-                a: 'Never. REGRAVA is architected on a strict Zero-Retention policy. Analysis is executed 100% in-memory (RAM) and wiped immediately after diff verification. Your code is never sent to third-party model providers, nor is it ever used for model training. This allows REGRAVA to pass SOC2, HIPAA, and GDPR enterprise audits in days.',
+                q: 'Does any of our proprietary code get stored, logged, or used to train AI models?',
+                a: 'Never. REGRAVA runs on an ephemeral in-memory memory sandbox. Once diff verification is computed, volatile RAM buffers are zeroed out (0x00000000). Your code is never persisted to disk, never sent to OpenAI/Anthropic, and never used for model training. This allows REGRAVA to pass SOC2 Type II, HIPAA, and GDPR audits in days.',
               },
               {
-                q: 'Can REGRAVA catch broken contracts across separate backend and frontend repositories?',
-                a: 'Yes! REGRAVA links your backend repository (e.g. FastAPI, Node, Go) with your frontend repository (e.g. React, Next.js, Vue) through its repository linking engine. Whenever a PR modifies an API endpoint schema on the backend, REGRAVA queries the registered frontend AST to ensure no consumers will break.',
+                q: 'How does REGRAVA correlate diffs across separate frontend and backend repositories?',
+                a: 'Through our Cross-Boundary AST Graph Router. When your backend PR changes a Pydantic or Go API model, REGRAVA queries the linked frontend repository AST and identifies every component accessing that endpoint. If a field was deleted or renamed, REGRAVA alerts you immediately and generates the frontend patch.',
               },
               {
-                q: 'Can we test REGRAVA without granting full GitHub organization permissions?',
-                a: 'Absolutely. You can explore the 1-Click Sandbox instantly with zero credentials. If you want to test your real repository, you can provide a fine-grained GitHub Personal Access Token (PAT) with read-only scopes, or install our verified GitHub App.',
-              },
-              {
-                q: 'What happens when a breaking contract or security trap is caught?',
-                a: 'REGRAVA flags the exact line and consumer file affected, explains why it breaks runtime execution, and automatically generates an AST-verified code patch alongside a ready-to-commit Vitest or pytest assertion.',
+                q: 'Can we test REGRAVA without giving broad permissions to our GitHub Organization?',
+                a: 'Yes! You can explore the 1-Click Demo Sandbox instantly with zero credentials. To scan your real repository, you can provide a fine-grained Personal Access Token (PAT) with read-only repository permissions, or connect our verified GitHub App.',
               },
             ].map((faq, idx) => (
               <div
                 key={idx}
-                className="rounded-xl bg-[#111318] border border-[#252932] overflow-hidden transition-all"
+                className="rounded-2xl bg-[#111318] border border-[#252932] overflow-hidden transition-all"
               >
                 <button
                   onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                  className="w-full px-5 py-4 text-left font-semibold text-xs text-[#F5F6F8] flex items-center justify-between hover:text-[#896EFF] transition-colors"
+                  className="w-full px-6 py-4 text-left font-bold text-xs text-[#F5F6F8] flex items-center justify-between hover:text-[#896EFF] transition-colors"
                 >
                   <span>{faq.q}</span>
                   <ChevronDown
@@ -1175,7 +1403,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   />
                 </button>
                 {openFaq === idx && (
-                  <div className="px-5 pb-4 text-xs text-[#9299A5] leading-relaxed border-t border-[#1C2028] pt-3">
+                  <div className="px-6 pb-4 text-xs text-[#9299A5] leading-relaxed border-t border-[#1C2028] pt-3">
                     {faq.a}
                   </div>
                 )}
@@ -1189,15 +1417,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         {/* ========================================================================= */}
         <section id="auth-gateway" className="max-w-xl mx-auto space-y-6 pt-6 scroll-mt-24 reveal-on-scroll">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider font-mono">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Get Started in 10 Seconds</span>
+              <span>Instant Launch Bay</span>
             </div>
-            <h2 className="text-3xl font-bold text-[#F5F6F8] tracking-tight">
+            <h2 className="text-3xl font-extrabold text-[#F5F6F8] tracking-tight">
               Ready to Secure Your Pull Requests?
             </h2>
             <p className="text-xs sm:text-sm text-[#9299A5]">
-              Experience the full application instantly in the 1-Click Sandbox, or sign in to scan your own repositories.
+              Experience the full application in the 1-Click Sandbox, or connect your GitHub repository.
             </p>
           </div>
 
@@ -1210,12 +1438,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           )}
 
           {/* Main Auth Box */}
-          <div className="p-7 rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl space-y-5 glow-purple">
+          <div className="p-8 rounded-3xl bg-[#111318] border border-[#252932] shadow-2xl space-y-5 glow-purple">
             {/* Primary Demo Button */}
             <button
               onClick={onLoginDemo}
               disabled={isLoggingIn}
-              className="w-full py-3.5 px-4 rounded-xl bg-[#7657FF] hover:bg-[#896EFF] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-xl shadow-purple-950/50 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#7657FF] to-[#896EFF] hover:brightness-110 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-2xl shadow-purple-950/60 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4 text-white" />
               <span>{isLoggingIn ? 'Spinning Sandbox...' : 'Launch Live Demo Sandbox (1-Click)'}</span>
@@ -1224,7 +1452,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
             <div className="flex items-center gap-3 my-2">
               <div className="h-px bg-[#252932] flex-1" />
-              <span className="text-[11px] font-semibold text-[#707783] uppercase tracking-wider">
+              <span className="text-[11px] font-semibold text-[#707783] uppercase tracking-wider font-mono">
                 Or Connect Your Account
               </span>
               <div className="h-px bg-[#252932] flex-1" />

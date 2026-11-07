@@ -157,4 +157,59 @@ body {
   animation: shimmerBorder 3s ease-in-out infinite;
 }
 
+/* Cybernetic Laser Flow & Pulse Animations */
+@keyframes laserFlow {
+  0% { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.animate-laser {
+  stroke-dasharray: 8 16;
+  animation: laserFlow 1.8s linear infinite;
+}
+
+@keyframes laserBreak {
+  0%, 100% { opacity: 0.3; stroke-width: 2; }
+  50% { opacity: 1; stroke-width: 4; }
+}
+
+.animate-laser-broken {
+  animation: laserBreak 0.6s ease-in-out infinite;
+}
+
+/* Glassmorphism Luxury Glow */
+.glass-obsidian {
+  background: rgba(17, 19, 24, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(37, 41, 50, 0.8);
+}
+
+.glass-obsidian:hover {
+  border-color: rgba(118, 87, 255, 0.45);
+  box-shadow: 0 0 25px -5px rgba(118, 87, 255, 0.2);
+}
+
+/* Matrix Terminal Scanlines */
+.scanlines {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 4px, 6px 100%;
+}
+
+/* Holographic gradient text */
+.text-hologram {
+  background: linear-gradient(135deg, #FFFFFF 0%, #E0D4FC 30%, #896EFF 65%, #10B981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+
 
