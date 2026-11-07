@@ -1154,7 +1154,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <button
                   onClick={() =>
                     copyToClipboard(
-                      `// REGRAVA Auto-Generated Vitest Contract Proof\nimport { describe, it, expect } from 'vitest';\nimport api from '../client';\n\ndescribe('Contract Verification PR #42', () => {\n  it('guarantees /api/v1/users contains id without schema mismatch', async () => {\n    const res = await api.get('/users/me');\n    expect(res.data).toHaveProperty('id');\n    expect(res.data.id).toBeTypeOf('number');\n  });\n});`,
+                      `// REGRAVA Auto-Generated Vitest Contract Proof\nimport { describe, it, expect } from 'vitest';\nimport api from '../client';\n\ndescribe('Contract Verification PR #42', () => {\n  it('verifies /api/v1/users contains id without schema mismatch', async () => {\n    const res = await api.get('/users/me');\n    expect(res.data).toHaveProperty('id');\n    expect(res.data.id).toBeTypeOf('number');\n  });\n});`,
                       'proof'
                     )
                   }
@@ -1457,7 +1457,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               <p className="text-xs text-[#9299A5] leading-relaxed">
                 {fleetScore === 100
-                  ? '✨ All 7 deterministic AST layers are 100% clean. Zero breaking contract regressions.'
+                  ? '✨ All 7 deterministic AST layers verified. No breaking contract regressions detected.'
                   : '⚠️ 2 unresolved contract and tenancy regressions detected in active PR branches.'}
               </p>
 
