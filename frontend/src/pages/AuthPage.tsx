@@ -542,13 +542,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
           {/* Monumental Headline */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#F5F6F8] leading-[1.08]">
-            Stop Hoping It Won’t Break. <br />
-            <span className="text-hologram">Know It Won’t.</span>
+            Your code passed review. <br />
+            <span className="text-hologram">Did the risks?</span>
           </h1>
 
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-[#9299A5] max-w-3xl mx-auto leading-relaxed">
-            No 2 AM PagerDuty alerts. No silent schema drift breaking your UI on Friday night. REGRAVA maps your backend API models to your frontend components in <span className="text-[#F5F6F8] font-semibold">&lt; 35ms</span> — so you can hit Merge with pure swagger.
+            REGRAVA independently examines pull requests, connects security findings with code changes, and tracks every issue until its resolution is checked.
           </p>
 
           {/* CLI Copy Chip + CTAs */}
