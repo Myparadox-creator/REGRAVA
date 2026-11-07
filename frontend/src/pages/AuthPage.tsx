@@ -802,7 +802,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <span className="text-[#48366F]">|</span>
             <span className="text-[#896EFF]">SUB-35MS COMPILER SENTINEL</span>
             <span className="text-[#48366F]">|</span>
-            <span className="text-[#10B981]">0% NOISE &bull; 100% PROOF</span>
+            <span className="text-[#10B981]">DETERMINISTIC COMPILER &bull; TEST SYNTHESIS</span>
           </div>
 
           {/* Monumental Headline */}
@@ -858,8 +858,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div className="text-xs text-[#707783] mt-0.5">AST Execution Latency</div>
             </div>
             <div className="p-4 rounded-xl glass-obsidian border-[#10B981]/30">
-              <div className="text-2xl font-black text-[#10B981] font-mono">0.00%</div>
-              <div className="text-xs text-[#707783] mt-0.5">Stochastic Hallucination</div>
+              <div className="text-2xl font-black text-[#10B981] font-mono">SYNTAX AST</div>
+              <div className="text-xs text-[#707783] mt-0.5">Deterministic Analysis</div>
             </div>
             <div className="p-4 rounded-xl glass-obsidian border-[#896EFF]/30">
               <div className="text-2xl font-black text-[#896EFF] font-mono">0 BYTES</div>
@@ -1298,7 +1298,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     : 'text-[#9299A5] hover:text-[#F5F6F8]'
                 }`}
               >
-                Generic AI (CodeRabbit / Copilot)
+                General-Purpose LLM Reviewers
               </button>
             </div>
           </div>
@@ -1314,43 +1314,43 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold font-mono text-[#896EFF] uppercase tracking-wider">
-                  REGRAVA Engine
+                  Deterministic AST Approach
                 </span>
                 <span className="px-2 py-0.5 rounded bg-[#10B981]/20 text-[#10B981] text-[10px] font-bold">
-                  COMPILER-GRADE VERIFICATION
+                  SYNTAX TREE VERIFICATION
                 </span>
               </div>
-              <h3 className="text-xl font-extrabold text-[#F5F6F8] mt-3">Deterministic Syntax Graph</h3>
+              <h3 className="text-xl font-extrabold text-[#F5F6F8] mt-3">Static Syntax & Contract Graph</h3>
 
               <ul className="space-y-3 mt-5 text-xs text-[#9299A5]">
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
                   <span>
-                    <strong>&lt; 35ms scan speed:</strong> Executes within normal Git pre-commit and PR webhooks without blocking merges.
+                    <strong>Low-Latency Diff Parsing:</strong> Executes syntax tree traversal locally within standard Git hooks or CI runners.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
                   <span>
-                    <strong>Zero False Positives:</strong> Flags only verified compiler nodes, missing variables, and concrete breaking contracts.
+                    <strong>Compiler-Verified Targets:</strong> Evaluates exact schema declarations and frontend consumer symbol references.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
                   <span>
-                    <strong>Ephemeral In-Memory Sandbox:</strong> Code is processed in RAM and destroyed. 0 bytes persisted, passes SOC2/HIPAA.
+                    <strong>In-Memory Execution:</strong> Processes diffs ephemerally in RAM with no source code retention or model fine-tuning.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0 mt-0.5" />
                   <span>
-                    <strong>Auto-Synthesizes Proofs:</strong> Delivers working Vitest assertions and AST patches, not conversation.
+                    <strong>Automated Test Synthesis:</strong> Generates reproducible client-side contract assertion tests (Vitest/pytest) from static diffs.
                   </span>
                 </li>
               </ul>
             </div>
 
-            {/* Stochastic Card */}
+            {/* General-Purpose LLM Card */}
             <div
               className={`p-7 rounded-3xl border transition-all ${
                 arenaMode === 'stochastic'
@@ -1360,37 +1360,37 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold font-mono text-[#F04452] uppercase tracking-wider">
-                  Generic Prompt Wrapper
+                  General-Purpose LLM Reviewers
                 </span>
                 <span className="px-2 py-0.5 rounded bg-[#F04452]/20 text-[#F04452] text-[10px] font-bold">
-                  PROBABILISTIC NEXT-TOKEN
+                  SEMANTIC REASONING
                 </span>
               </div>
-              <h3 className="text-xl font-extrabold text-[#F5F6F8] mt-3">Probabilistic LLM Wrapper</h3>
+              <h3 className="text-xl font-extrabold text-[#F5F6F8] mt-3">Prompt & Agentic Analysis</h3>
 
               <ul className="space-y-3 mt-5 text-xs text-[#9299A5]">
                 <li className="flex items-start gap-2.5">
                   <XCircle className="w-4 h-4 text-[#F04452] shrink-0 mt-0.5" />
                   <span>
-                    <strong>Alert Fatigue & Noise:</strong> Floods PRs with 15-20 cosmetic markdown comments ("consider renaming x").
+                    <strong>Stochastic Variation:</strong> Prompt-driven outputs can vary between runs, requiring extra filtering to ensure reproducibility.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <XCircle className="w-4 h-4 text-[#F04452] shrink-0 mt-0.5" />
                   <span>
-                    <strong>Blind to Cross-Boundary Diff:</strong> Reviews single files in silos; misses when a Python change breaks React TSX.
+                    <strong>High Infrastructure Overhead:</strong> Deep codebase vector indexing and multi-agent reasoning require substantial token compute.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <XCircle className="w-4 h-4 text-[#F04452] shrink-0 mt-0.5" />
                   <span>
-                    <strong>Cloud Data Exposure:</strong> Transmits intellectual property and source code to third-party AI APIs.
+                    <strong>Enterprise Data Governance:</strong> Requires vetting cloud LLM data policies, tenancy boundaries, and SOC2/ISO compliance.
                   </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <XCircle className="w-4 h-4 text-[#F04452] shrink-0 mt-0.5" />
                   <span>
-                    <strong>High Token Latency:</strong> Multi-file reviews take 45–90+ seconds, disrupting fast deployment cadences.
+                    <strong>Inference Latency:</strong> Generating multi-turn natural language explanations takes longer than pure compiler AST parsing.
                   </span>
                 </li>
               </ul>
@@ -1633,8 +1633,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           <div className="max-w-3xl mx-auto space-y-3">
             {[
               {
-                q: 'How is REGRAVA different from CodeRabbit, Qodo, or GitHub Copilot?',
-                a: 'CodeRabbit and Copilot treat source code as natural language text prompts sent to cloud LLMs. They suffer from hallucinations, high token latency (45-90s), and zero cross-repo awareness. REGRAVA constructs real Abstract Syntax Trees (ASTs) of backend models and traverses directly to React JSX consumers in < 35ms with 0% hallucinations and zero cloud retention.',
+                q: 'How does REGRAVA compare with platforms like CodeRabbit, Qodo, or Semgrep Pro?',
+                a: 'Platforms like CodeRabbit and Qodo construct comprehensive CodeGraphs, multi-linter execution sandboxes, and multi-repo software maps, while Semgrep Pro provides interprocedural taint analysis across enterprise codebases. REGRAVA focuses on a specialized, lightweight hypothesis: providing local-first, low-latency AST diff traversal specifically targeting backend-to-frontend schema drift (e.g. FastAPI to React/TSX) with zero cloud data retention and automated client-side test synthesis, without requiring heavyweight persistent graph databases.',
               },
               {
                 q: 'Does any of our proprietary code get stored, logged, or used to train AI models?',
