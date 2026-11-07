@@ -3,6 +3,7 @@ import {
   Sparkles,
   Github,
   ArrowRight,
+  ArrowLeft,
   Layers,
   AlertCircle,
   KeyRound,
@@ -25,6 +26,9 @@ import {
   Network,
   Radio,
   Flame,
+  Lock,
+  Cpu,
+  ShieldCheck,
 } from 'lucide-react';
 import { getGoogleAuthUrl, getGitHubAuthUrl } from '../services/api';
 
@@ -50,6 +54,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   isLoggingIn,
   onConnectToken,
 }) => {
+  // Page Routing State: 'landing' vs 'signin'
+  const [currentView, setCurrentView] = useState<'landing' | 'signin'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view') === 'signin' || window.location.hash === '#signin'
+      ? 'signin'
+      : 'landing';
+  });
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showTokenForm, setShowTokenForm] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
@@ -105,6 +117,33 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   // Canvas Ref for Ambient Particle Constellation
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // View Navigation Helpers
+  const navigateToSignIn = () => {
+    setCurrentView('signin');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'signin');
+    window.history.pushState({}, '', url.toString());
+  };
+
+  const navigateToLanding = () => {
+    setCurrentView('landing');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    window.history.pushState({}, '', url.toString());
+  };
+
+  // Sync with browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setCurrentView(params.get('view') === 'signin' ? 'signin' : 'landing');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Background Canvas Ambient Particles with Mouse Connection
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -131,7 +170,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       vx: (Math.random() - 0.5) * 0.45,
       vy: (Math.random() - 0.5) * 0.45,
       radius: Math.random() * 1.8 + 0.8,
-      hue: Math.random() > 0.6 ? 260 : 160, // Purple or emerald hints
+      hue: Math.random() > 0.6 ? 260 : 160,
     }));
 
     let mouseX = -1000;
@@ -198,7 +237,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [currentView]);
 
   // Telemetry Micro-Clock
   useEffect(() => {
@@ -228,6 +267,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   }, []);
 
   useEffect(() => {
+    if (currentView !== 'landing') return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -243,7 +284,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     elements.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, [layers, graphScenario]);
+  }, [layers, graphScenario, currentView]);
 
   // Execute Simulated CLI Commands
   const runTerminalCommand = (cmd: string) => {
@@ -304,11 +345,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const outagesPreventedYearly = Math.max(1, Math.round(teamSize * 0.32));
   const financialRoiMultiplier = ((dollarsSavedMonthly * 12) / (teamSize * 240)).toFixed(1);
 
-  const scrollToAuth = () => {
-    const el = document.getElementById('auth-gateway');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
-
   const scrollToGraph = () => {
     const el = document.getElementById('interactive-ast-graph');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -335,11 +371,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setErrorMsg(
           'Google OAuth client credentials are not configured in environment (.env). You can explore the 1-Click Demo Sandbox or use a GitHub Token below!'
         );
-        scrollToAuth();
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to initialize Google authentication');
-      scrollToAuth();
     }
   };
 
@@ -354,11 +388,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           'GitHub App credentials are not configured in environment (.env). You can sign in directly using a GitHub Token below, or explore the 1-Click Demo Sandbox!'
         );
         setShowTokenForm(true);
-        scrollToAuth();
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to initialize GitHub authentication');
-      scrollToAuth();
     }
   };
 
@@ -396,6 +428,239 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     'Turborepo',
   ];
 
+  // =========================================================================
+  // DEDICATED SIGN-IN / AUTHENTICATION PAGE VIEW
+  // =========================================================================
+  if (currentView === 'signin') {
+    return (
+      <div className="min-h-screen w-full bg-[#08090C] text-[#D1D5DC] font-sans antialiased selection:bg-[#7657FF]/35 selection:text-white relative flex flex-col justify-between overflow-x-hidden">
+        {/* Ambient Canvas and Flare */}
+        <canvas
+          ref={canvasRef}
+          className="fixed inset-0 pointer-events-none z-0 opacity-40"
+        />
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[550px] bg-gradient-to-b from-[#7657FF]/20 via-[#48366F]/10 to-transparent blur-[140px] pointer-events-none z-0" />
+
+        {/* Top Header */}
+        <header className="relative z-10 px-6 lg:px-12 py-4 border-b border-[#1C2028] bg-[#0B0D11]/90 backdrop-blur-xl flex items-center justify-between">
+          <button
+            onClick={navigateToLanding}
+            className="flex items-center gap-2 text-xs font-semibold text-[#9299A5] hover:text-[#F5F6F8] px-3 py-1.5 rounded-lg hover:bg-[#15181F] border border-transparent hover:border-[#252932] transition-all"
+          >
+            <ArrowLeft className="w-4 h-4 text-[#896EFF]" />
+            <span>Back to Home</span>
+          </button>
+
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={navigateToLanding}
+          >
+            <img
+              src="/regrava-icon.png"
+              alt="REGRAVA"
+              className="w-8 h-8 rounded-lg object-contain border border-[#252932] bg-[#08090C]"
+            />
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-base tracking-tight text-[#F5F6F8]">REGRAVA</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#211A35] text-[#896EFF] border border-[#48366F]">
+                v2.0
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs font-mono text-[#10B981]">
+            <Lock className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Zero-Retention In-Memory Engine</span>
+          </div>
+        </header>
+
+        {/* Main Dedicated Sign-In Container */}
+        <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md space-y-6">
+            {/* Brand Banner Card */}
+            <div className="rounded-2xl overflow-hidden border border-[#252932] shadow-2xl bg-[#111318]">
+              <img
+                src="/regrava-banner.png"
+                alt="REGRAVA - Review, Track, Verify, Merge with Confidence"
+                className="w-full h-auto object-cover"
+              />
+            </div>
+
+            {/* Headline Text */}
+            <div className="text-center space-y-1.5">
+              <h1 className="text-2xl font-black tracking-tight text-[#F5F6F8]">
+                Sign in to REGRAVA
+              </h1>
+              <p className="text-xs text-[#9299A5]">
+                Inspect your pull requests, map cross-repo contracts, and eliminate breaking changes.
+              </p>
+            </div>
+
+            {/* Error Alert if any */}
+            {errorMsg && (
+              <div className="p-3.5 rounded-xl bg-[#F04452]/15 border border-[#F04452]/30 text-xs text-[#F04452] flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="leading-relaxed">{errorMsg}</div>
+              </div>
+            )}
+
+            {/* Main Auth Box */}
+            <div className="p-7 rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl space-y-4 glow-purple">
+              {/* Primary 1-Click Demo Sandbox */}
+              <button
+                onClick={async () => {
+                  setErrorMsg(null);
+                  try {
+                    await onLoginDemo();
+                  } catch (err: any) {
+                    setErrorMsg(err.message || 'Demo login failed');
+                  }
+                }}
+                disabled={isLoggingIn}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#7657FF] to-[#896EFF] hover:brightness-110 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-purple-950/60 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+              >
+                <Sparkles className="w-4 h-4 text-white" />
+                <span>{isLoggingIn ? 'Launching Sandbox...' : 'Explore Demo Sandbox (1-Click)'}</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </button>
+
+              <div className="flex items-center gap-3 my-2">
+                <div className="h-px bg-[#252932] flex-1" />
+                <span className="text-[11px] font-semibold text-[#707783] uppercase tracking-wider font-mono">
+                  Or Sign In
+                </span>
+                <div className="h-px bg-[#252932] flex-1" />
+              </div>
+
+              {/* Google Login */}
+              <button
+                onClick={handleGoogleLogin}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
+              </button>
+
+              {/* GitHub Login */}
+              <button
+                onClick={handleGitHubLogin}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
+              >
+                <Github className="w-4 h-4 text-white" />
+                <span>Continue with GitHub</span>
+              </button>
+
+              {/* Direct GitHub Token (PAT) Option */}
+              <div className="pt-2 border-t border-[#1C2028]">
+                <button
+                  type="button"
+                  onClick={() => setShowTokenForm(!showTokenForm)}
+                  className="w-full text-center text-xs text-[#896EFF] hover:text-[#7657FF] font-medium flex items-center justify-center gap-1.5 py-1 transition-colors"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>{showTokenForm ? 'Hide Token Sign-In' : 'Or Sign In with GitHub Token (PAT)'}</span>
+                </button>
+
+                {showTokenForm && (
+                  <form
+                    onSubmit={handleTokenSubmit}
+                    className="mt-3 space-y-3 p-4 rounded-xl bg-[#0B0D11] border border-[#252932]"
+                  >
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-[#D1D5DC]">Personal Access Token</span>
+                      <a
+                        href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=REGRAVA%20Security%20Scanner"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#896EFF] hover:underline flex items-center gap-1 text-[10px]"
+                      >
+                        Generate Token <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+
+                    <input
+                      type="password"
+                      value={tokenInput}
+                      onChange={(e) => setTokenInput(e.target.value)}
+                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                      className="w-full px-3 py-2 rounded-lg bg-[#15181F] border border-[#252932] text-xs text-[#F5F6F8] placeholder-[#707783] focus:outline-none focus:border-[#7657FF] font-mono"
+                    />
+
+                    <p className="text-[10px] text-[#707783] leading-relaxed">
+                      Instantly load and scan your real public or private repositories without configuring GitHub OAuth.
+                    </p>
+
+                    <button
+                      type="submit"
+                      disabled={isConnectingToken || !tokenInput.trim()}
+                      className="w-full py-2.5 px-3 rounded-lg bg-[#7657FF] hover:bg-[#896EFF] text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {isConnectingToken ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Verifying Token with GitHub...</span>
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound className="w-3.5 h-3.5" />
+                          <span>Sign In with GitHub Token</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+
+            {/* Trust Badges */}
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="p-3 rounded-xl bg-[#111318] border border-[#1C2028] space-y-1">
+                <Cpu className="w-4 h-4 mx-auto text-[#896EFF]" />
+                <div className="text-[11px] font-semibold text-[#F5F6F8]">Deterministic</div>
+                <div className="text-[10px] text-[#707783]">AST Engine</div>
+              </div>
+              <div className="p-3 rounded-xl bg-[#111318] border border-[#1C2028] space-y-1">
+                <Lock className="w-4 h-4 mx-auto text-[#10B981]" />
+                <div className="text-[11px] font-semibold text-[#F5F6F8]">Zero Retention</div>
+                <div className="text-[10px] text-[#707783]">100% In-Memory</div>
+              </div>
+              <div className="p-3 rounded-xl bg-[#111318] border border-[#1C2028] space-y-1">
+                <ShieldCheck className="w-4 h-4 mx-auto text-[#F59E0B]" />
+                <div className="text-[11px] font-semibold text-[#F5F6F8]">Read-Only</div>
+                <div className="text-[10px] text-[#707783]">Minimal Scopes</div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Sign-In Footer */}
+        <footer className="relative z-10 px-8 py-4 border-t border-[#1C2028] text-center text-xs text-[#707783]">
+          &copy; {new Date().getFullYear()} REGRAVA Platform &bull; Zero-Retention Security Architecture
+        </footer>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // THE ASTONISHING LANDING PAGE VIEW
+  // =========================================================================
   return (
     <div className="min-h-screen w-full bg-[#08090C] text-[#D1D5DC] font-sans antialiased selection:bg-[#7657FF]/35 selection:text-white relative overflow-x-hidden">
       {/* Background Ambient Canvas Constellation */}
@@ -433,9 +698,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <span>{isLoggingIn ? 'Spinning Sandbox...' : 'Launch 1-Click Sandbox'}</span>
           </button>
           <button
-            onClick={scrollToAuth}
+            onClick={navigateToSignIn}
             className="p-2 rounded-xl text-[#9299A5] hover:text-[#F5F6F8] hover:bg-[#15181F] transition-colors"
-            title="Sign In with GitHub"
+            title="Sign In to REGRAVA"
           >
             <Github className="w-4 h-4" />
           </button>
@@ -504,7 +769,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           {/* Right CTAs */}
           <div className="flex items-center gap-3">
             <button
-              onClick={scrollToAuth}
+              onClick={navigateToSignIn}
               className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[#D1D5DC] hover:text-[#F5F6F8] hover:bg-[#15181F] border border-transparent hover:border-[#252932] transition-all"
             >
               Sign In
@@ -720,7 +985,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               {/* Dynamic SVG Laser Beams */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
-                {/* Laser from Backend Schema to Central Sentinel Engine */}
                 <path
                   d="M 230 140 C 340 140, 360 230, 480 230"
                   fill="transparent"
@@ -729,7 +993,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   className={graphScenario === 'broken' ? 'animate-laser-broken' : 'animate-laser'}
                 />
 
-                {/* Laser from Central Sentinel Engine to React Frontend */}
                 <path
                   d="M 640 230 C 740 230, 770 140, 880 140"
                   fill="transparent"
@@ -738,7 +1001,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   className={graphScenario === 'broken' ? 'animate-laser-broken' : 'animate-laser'}
                 />
 
-                {/* Laser from Central Sentinel Engine to Mobile iOS/Android Client */}
                 <path
                   d="M 640 230 C 740 230, 770 340, 880 340"
                   fill="transparent"
@@ -1413,145 +1675,40 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 8. AUTH GATEWAY / ONBOARDING HUB */}
+        {/* 8. FINAL CALL TO ACTION (Redirects to Dedicated Sign-In Page) */}
         {/* ========================================================================= */}
-        <section id="auth-gateway" className="max-w-xl mx-auto space-y-6 pt-6 scroll-mt-24 reveal-on-scroll">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#896EFF] uppercase tracking-wider font-mono">
+        <section className="max-w-4xl mx-auto pt-6 pb-12 reveal-on-scroll">
+          <div className="p-10 sm:p-14 rounded-3xl bg-gradient-to-b from-[#15181F] to-[#111318] border border-[#48366F] text-center space-y-6 shadow-2xl relative overflow-hidden glow-purple">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#211A35] border border-[#48366F] text-xs font-mono text-[#896EFF]">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Instant Launch Bay</span>
+              <span>ZERO CONFIGURATION DEPLOYMENT</span>
             </div>
-            <h2 className="text-3xl font-extrabold text-[#F5F6F8] tracking-tight">
-              Ready to Secure Your Pull Requests?
+
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-[#F5F6F8]">
+              Ready to eliminate breaking changes?
             </h2>
-            <p className="text-xs sm:text-sm text-[#9299A5]">
-              Experience the full application in the 1-Click Sandbox, or connect your GitHub repository.
+
+            <p className="text-sm text-[#9299A5] max-w-xl mx-auto leading-relaxed">
+              Experience deterministic pull request protection today. Launch the 1-click sandbox or connect your GitHub repository in under 60 seconds.
             </p>
-          </div>
 
-          {/* Error Alert if any */}
-          {errorMsg && (
-            <div className="p-4 rounded-xl bg-[#F04452]/10 border border-[#F04452]/30 text-xs text-[#F04452] flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div className="leading-relaxed">{errorMsg}</div>
-            </div>
-          )}
-
-          {/* Main Auth Box */}
-          <div className="p-8 rounded-3xl bg-[#111318] border border-[#252932] shadow-2xl space-y-5 glow-purple">
-            {/* Primary Demo Button */}
-            <button
-              onClick={onLoginDemo}
-              disabled={isLoggingIn}
-              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#7657FF] to-[#896EFF] hover:brightness-110 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-2xl shadow-purple-950/60 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
-            >
-              <Sparkles className="w-4 h-4 text-white" />
-              <span>{isLoggingIn ? 'Spinning Sandbox...' : 'Launch Live Demo Sandbox (1-Click)'}</span>
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </button>
-
-            <div className="flex items-center gap-3 my-2">
-              <div className="h-px bg-[#252932] flex-1" />
-              <span className="text-[11px] font-semibold text-[#707783] uppercase tracking-wider font-mono">
-                Or Connect Your Account
-              </span>
-              <div className="h-px bg-[#252932] flex-1" />
-            </div>
-
-            {/* Google Login */}
-            <button
-              onClick={handleGoogleLogin}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </button>
-
-            {/* GitHub Login */}
-            <button
-              onClick={handleGitHubLogin}
-              className="w-full py-2.5 px-4 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
-            >
-              <Github className="w-4 h-4 text-white" />
-              <span>Continue with GitHub</span>
-            </button>
-
-            {/* Direct GitHub Token (PAT) Option */}
-            <div className="pt-2 border-t border-[#1C2028]">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <button
-                type="button"
-                onClick={() => setShowTokenForm(!showTokenForm)}
-                className="w-full text-center text-xs text-[#896EFF] hover:text-[#7657FF] font-medium flex items-center justify-center gap-1.5 py-1 transition-colors"
+                onClick={onLoginDemo}
+                disabled={isLoggingIn}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#7657FF] to-[#896EFF] hover:brightness-110 text-white font-extrabold text-sm shadow-xl shadow-purple-950/60 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
               >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>{showTokenForm ? 'Hide Token Sign-In' : 'Or Sign In with GitHub Token (PAT)'}</span>
+                <Sparkles className="w-4 h-4 text-white" />
+                <span>{isLoggingIn ? 'Launching Sandbox...' : 'Launch Live Demo Sandbox'}</span>
               </button>
 
-              {showTokenForm && (
-                <form
-                  onSubmit={handleTokenSubmit}
-                  className="mt-3 space-y-3 p-4 rounded-xl bg-[#0B0D11] border border-[#252932]"
-                >
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-semibold text-[#D1D5DC]">Personal Access Token</span>
-                    <a
-                      href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=REGRAVA%20Security%20Scanner"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#896EFF] hover:underline flex items-center gap-1 text-[10px]"
-                    >
-                      Generate Token <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
-                  </div>
-
-                  <input
-                    type="password"
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value)}
-                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                    className="w-full px-3 py-2 rounded-lg bg-[#15181F] border border-[#252932] text-xs text-[#F5F6F8] placeholder-[#707783] focus:outline-none focus:border-[#7657FF] font-mono"
-                  />
-
-                  <p className="text-[10px] text-[#707783] leading-relaxed">
-                    Instantly load and scan your real public or private repositories without configuring GitHub OAuth.
-                  </p>
-
-                  <button
-                    type="submit"
-                    disabled={isConnectingToken || !tokenInput.trim()}
-                    className="w-full py-2.5 px-3 rounded-lg bg-[#7657FF] hover:bg-[#896EFF] text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  >
-                    {isConnectingToken ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Verifying Token with GitHub...</span>
-                      </>
-                    ) : (
-                      <>
-                        <KeyRound className="w-3.5 h-3.5" />
-                        <span>Sign In with GitHub Token</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
+              <button
+                onClick={navigateToSignIn}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] hover:border-[#48366F] text-[#F5F6F8] font-bold text-sm transition-all flex items-center justify-center gap-2"
+              >
+                <Github className="w-4 h-4 text-white" />
+                <span>Sign In to Connect Repositories &rarr;</span>
+              </button>
             </div>
           </div>
         </section>
