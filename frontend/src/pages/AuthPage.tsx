@@ -533,22 +533,22 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10B981] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-[#10B981]"></span>
             </span>
-            <span className="text-[#F5F6F8] font-bold">DETERMINISTIC COMPILER GRAPH</span>
+            <span className="text-[#F5F6F8] font-bold">BUILT FOR ZERO-OUTAGE TEAMS</span>
             <span className="text-[#48366F]">|</span>
-            <span className="text-[#896EFF]">ZERO CLOUD RETENTION</span>
+            <span className="text-[#896EFF]">SUB-35MS COMPILER SENTINEL</span>
             <span className="text-[#48366F]">|</span>
-            <span className="text-[#10B981]">0% HALLUCINATION RATE</span>
+            <span className="text-[#10B981]">0% NOISE &bull; 100% PROOF</span>
           </div>
 
           {/* Monumental Headline */}
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#F5F6F8] leading-[1.08]">
-            Mathematical Certainty <br />
-            <span className="text-hologram">For Every Pull Request.</span>
+            Stop Hoping It Won’t Break. <br />
+            <span className="text-hologram">Know It Won’t.</span>
           </h1>
 
           {/* Subtitle */}
           <p className="text-base sm:text-lg text-[#9299A5] max-w-3xl mx-auto leading-relaxed">
-            We didn’t wrap an LLM in a prompt. We built a polyglot compiler graph that tracks every schema change between your backend and frontend in <span className="text-[#F5F6F8] font-semibold">&lt; 35ms</span> before code reaches production.
+            No 2 AM PagerDuty alerts. No silent schema drift breaking your UI on Friday night. REGRAVA maps your backend API models to your frontend components in <span className="text-[#F5F6F8] font-semibold">&lt; 35ms</span> — so you can hit Merge with pure swagger.
           </p>
 
           {/* CLI Copy Chip + CTAs */}
@@ -1055,7 +1055,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   REGRAVA Engine
                 </span>
                 <span className="px-2 py-0.5 rounded bg-[#10B981]/20 text-[#10B981] text-[10px] font-bold">
-                  MATHEMATICAL PROOF
+                  COMPILER-GRADE VERIFICATION
                 </span>
               </div>
               <h3 className="text-xl font-extrabold text-[#F5F6F8] mt-3">Deterministic Syntax Graph</h3>
