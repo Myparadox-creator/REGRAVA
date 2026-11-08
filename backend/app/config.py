@@ -52,7 +52,10 @@ class Settings(BaseModel):
     # Google OAuth
     GOOGLE_CLIENT_ID: Optional[str] = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: Optional[str] = os.getenv("GOOGLE_CLIENT_SECRET")
-    GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5173/auth/google/callback")
+    GOOGLE_REDIRECT_URI: str = os.getenv(
+        "GOOGLE_REDIRECT_URI",
+        "http://127.0.0.1:8000/api/auth/google/callback",
+    )
 
     # GitHub App Integration
     GITHUB_APP_ID: Optional[str] = os.getenv("GITHUB_APP_ID")
@@ -68,27 +71,59 @@ class Settings(BaseModel):
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
 
-    def get_github_client_id(self) -> Optional[str]:
-        if self.GITHUB_CLIENT_ID:
-            return self.GITHUB_CLIENT_ID
+    def get_google_client_id(self) -> Optional[str]:
         try:
             from app.db.session_db import db
-            return db.get_config("GITHUB_CLIENT_ID")
+            val = db.get_config("GOOGLE_CLIENT_ID")
+            if val:
+                return val
         except Exception:
-            return None
+            pass
+        return self.GOOGLE_CLIENT_ID
+
+    def get_google_client_secret(self) -> Optional[str]:
+        try:
+            from app.db.session_db import db
+            val = db.get_config("GOOGLE_CLIENT_SECRET")
+            if val:
+                return val
+        except Exception:
+            pass
+        return self.GOOGLE_CLIENT_SECRET
+
+    def get_github_client_id(self) -> Optional[str]:
+        try:
+            from app.db.session_db import db
+            val = db.get_config("GITHUB_CLIENT_ID")
+            if val:
+                return val
+        except Exception:
+            pass
+        return self.GITHUB_CLIENT_ID
 
     def get_github_client_secret(self) -> Optional[str]:
-        if self.GITHUB_CLIENT_SECRET:
-            return self.GITHUB_CLIENT_SECRET
         try:
             from app.db.session_db import db
-            return db.get_config("GITHUB_CLIENT_SECRET")
+            val = db.get_config("GITHUB_CLIENT_SECRET")
+            if val:
+                return val
         except Exception:
-            return None
+            pass
+        return self.GITHUB_CLIENT_SECRET
 
     @property
     def is_google_configured(self) -> bool:
-        return bool(self.GOOGLE_CLIENT_ID and self.GOOGLE_CLIENT_SECRET)
+        cid = self.get_google_client_id()
+        csec = self.get_google_client_secret()
+        if not cid or not csec:
+            return False
+        clean_cid = cid.strip()
+        clean_csec = csec.strip()
+        if not clean_cid or not clean_csec:
+            return False
+        if clean_cid.startswith("test_") or "your_" in clean_cid.lower():
+            return False
+        return True
 
     @property
     def is_github_configured(self) -> bool:
@@ -96,7 +131,17 @@ class Settings(BaseModel):
 
     @property
     def is_github_oauth_configured(self) -> bool:
-        return bool(self.get_github_client_id() and self.get_github_client_secret())
+        cid = self.get_github_client_id()
+        csec = self.get_github_client_secret()
+        if not cid or not csec:
+            return False
+        clean_cid = cid.strip()
+        clean_csec = csec.strip()
+        if not clean_cid or not clean_csec:
+            return False
+        if clean_cid.startswith("test_") or "your_" in clean_cid.lower():
+            return False
+        return True
 
 
 settings = Settings()

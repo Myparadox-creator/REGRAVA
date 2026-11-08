@@ -44,32 +44,39 @@ class AuthService:
 
     # --- Google OAuth Flow ---
     def get_google_auth_url(self) -> str:
-        if not settings.is_google_configured:
-            return "/login?error=google_not_configured"
-
+        cid = settings.get_google_client_id()
+        csec = settings.get_google_client_secret()
         state = self.generate_oauth_state("google")
-        params = {
-            "client_id": settings.GOOGLE_CLIENT_ID,
-            "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-            "response_type": "code",
-            "scope": "openid email profile",
-            "state": state,
-            "access_type": "offline",
-            "prompt": "select_account",
-        }
-        return f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
 
-    async def handle_google_callback(self, code: str, state: str) -> Dict[str, Any]:
+        if cid and csec:
+            params = {
+                "client_id": cid,
+                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                "response_type": "code",
+                "scope": "openid email profile",
+                "state": state,
+                "access_type": "offline",
+                "prompt": "select_account",
+            }
+            return f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+
+        return "/login?action=google_setup"
+
+    async def handle_google_callback(
+        self, code: str, state: str, user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         if not self.verify_oauth_state(state, "google"):
             raise HTTPException(status_code=400, detail="Invalid or expired OAuth state parameter (CSRF detected).")
 
-        if not settings.is_google_configured:
+        cid = settings.get_google_client_id()
+        csec = settings.get_google_client_secret()
+        if not settings.is_google_configured or not cid or not csec:
             raise HTTPException(status_code=500, detail="Google OAuth credentials are not configured on this server.")
 
         token_url = "https://oauth2.googleapis.com/token"
         data = {
-            "client_id": settings.GOOGLE_CLIENT_ID,
-            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "client_id": cid,
+            "client_secret": csec,
             "code": code,
             "grant_type": "authorization_code",
             "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -92,19 +99,32 @@ class AuthService:
 
             userinfo = userinfo_res.json()
             email = userinfo.get("email")
-            name = userinfo.get("name") or email.split("@")[0]
+            name = userinfo.get("name") or (email.split("@")[0] if email else "Google User")
             avatar = userinfo.get("picture")
 
-            user = db.upsert_user(
-                email=email,
-                name=name,
-                auth_provider="google",
-                avatar_url=avatar,
-                is_demo=False,
-            )
+            if not user_id:
+                user = db.upsert_user(
+                    email=email,
+                    name=name,
+                    auth_provider="google",
+                    avatar_url=avatar,
+                    is_demo=False,
+                )
+                user_id = user["id"]
+            else:
+                user = db.get_user_by_id(user_id)
+                if user and user.get("is_demo"):
+                    user = db.upsert_user(
+                        email=email,
+                        name=name,
+                        auth_provider="google",
+                        avatar_url=avatar,
+                        is_demo=False,
+                    )
+                    user_id = user["id"]
 
             session_token = self.generate_session_token()
-            db.create_session(user["id"], session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
+            db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
             return {"user": user, "session_token": session_token}
 
     # --- GitHub App & OAuth Connection Flow ---
@@ -230,7 +250,6 @@ class AuthService:
             if repo_res.status_code == 200:
                 authorized_repos = [r["full_name"] for r in repo_res.json() if "full_name" in r]
 
-            session_token = None
             if not user_id:
                 # User signed in via GitHub directly from Auth screen
                 user = db.upsert_user(
@@ -241,10 +260,20 @@ class AuthService:
                     is_demo=False,
                 )
                 user_id = user["id"]
-                session_token = self.generate_session_token()
-                db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
             else:
                 user = db.get_user_by_id(user_id)
+                if user and user.get("is_demo"):
+                    user = db.upsert_user(
+                        email=email,
+                        name=user_data.get("name") or gh_username,
+                        auth_provider="github",
+                        avatar_url=gh_avatar,
+                        is_demo=False,
+                    )
+                    user_id = user["id"]
+
+            session_token = self.generate_session_token()
+            db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
 
             db.save_github_account(
                 user_id=user_id,

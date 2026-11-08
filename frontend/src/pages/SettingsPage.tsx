@@ -17,6 +17,7 @@ import {
 import { UserProfile, GitHubAccount } from '../types';
 import { getGitHubAuthUrl } from '../services/api';
 import { GitHubOAuthSetupModal } from '../components/GitHubOAuthSetupModal';
+import { GoogleOAuthSetupModal } from '../components/GoogleOAuthSetupModal';
 
 interface SettingsPageProps {
   user: UserProfile | null;
@@ -37,6 +38,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   const isGitHubConnected = !!(githubAccount && githubAccount.github_username);
   const [showOAuthSetup, setShowOAuthSetup] = useState(false);
+  const [showGoogleOAuthSetup, setShowGoogleOAuthSetup] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [isConnectingToken, setIsConnectingToken] = useState(false);
   const [tokenSuccessMsg, setTokenSuccessMsg] = useState<string | null>(null);
@@ -112,9 +114,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <span className="text-[#9299A5]">Auth Method:</span>
               <span className="text-[#896EFF] uppercase font-semibold">{user?.auth_provider || 'DEMO'}</span>
             </div>
-            <div className="flex justify-between py-1.5">
+            <div className="flex justify-between py-1.5 border-b border-[#1C2028]">
               <span className="text-[#9299A5]">Session Security:</span>
               <span className="text-[#10B981]">HttpOnly / HMAC Signed</span>
+            </div>
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-[#9299A5]">Google OAuth:</span>
+              <button
+                type="button"
+                onClick={() => setShowGoogleOAuthSetup(true)}
+                className="text-[#896EFF] hover:underline flex items-center gap-1 text-[10px]"
+              >
+                <span>Configure Google</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </button>
             </div>
           </div>
 
@@ -375,6 +388,16 @@ regrava scan --repo . --fail-on high`}</code>
         onClose={() => setShowOAuthSetup(false)}
         onConfigured={(authUrl) => {
           setShowOAuthSetup(false);
+          window.location.href = authUrl;
+        }}
+      />
+
+      {/* Google OAuth Setup Modal */}
+      <GoogleOAuthSetupModal
+        isOpen={showGoogleOAuthSetup}
+        onClose={() => setShowGoogleOAuthSetup(false)}
+        onConfigured={(authUrl) => {
+          setShowGoogleOAuthSetup(false);
           window.location.href = authUrl;
         }}
       />

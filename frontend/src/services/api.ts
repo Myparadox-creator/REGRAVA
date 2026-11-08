@@ -21,9 +21,21 @@ async function fetchJson<T>(
   options?: RequestInit,
   defaultErrMsg = 'Request failed'
 ): Promise<T> {
+  const token = localStorage.getItem('regrava_token');
+  const headers = new Headers(options?.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const mergedOptions: RequestInit = {
+    ...options,
+    headers,
+    credentials: 'include',
+  };
+
   let res: Response;
   try {
-    res = await fetch(url, options);
+    res = await fetch(url, mergedOptions);
   } catch (networkErr: any) {
     throw new Error(
       `Cannot connect to REGRAVA backend at ${url}. Please ensure the backend is running on port 8000. (${networkErr.message})`
@@ -95,6 +107,7 @@ export async function loginDemo(): Promise<{ status: string; user: UserProfile; 
 }
 
 export async function logout(): Promise<{ status: string }> {
+  localStorage.removeItem('regrava_token');
   return fetchJson<{ status: string }>(
     `${API_BASE}/auth/logout`,
     { method: 'POST' },
@@ -102,11 +115,46 @@ export async function logout(): Promise<{ status: string }> {
   );
 }
 
-export async function getGoogleAuthUrl(): Promise<{ url: string; is_configured: boolean }> {
-  return fetchJson<{ url: string; is_configured: boolean }>(
+export async function getGoogleAuthUrl(): Promise<{
+  url: string;
+  is_configured: boolean;
+  callback_url?: string;
+}> {
+  return fetchJson<{ url: string; is_configured: boolean; callback_url?: string }>(
     `${API_BASE}/auth/google/url`,
     undefined,
     'Failed to get Google auth URL'
+  );
+}
+
+export async function fetchGoogleConfigInfo(): Promise<{
+  is_configured: boolean;
+  client_id: string | null;
+  callback_url: string;
+  origin_urls: string[];
+  setup_url: string;
+}> {
+  return fetchJson<{
+    is_configured: boolean;
+    client_id: string | null;
+    callback_url: string;
+    origin_urls: string[];
+    setup_url: string;
+  }>(`${API_BASE}/auth/google/config-info`, undefined, 'Failed to get Google config info');
+}
+
+export async function configureGoogleOAuth(
+  clientId: string,
+  clientSecret: string
+): Promise<{ status: string; is_configured: boolean; auth_url: string }> {
+  return fetchJson<{ status: string; is_configured: boolean; auth_url: string }>(
+    `${API_BASE}/auth/google/configure`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+    },
+    'Failed to configure Google OAuth'
   );
 }
 

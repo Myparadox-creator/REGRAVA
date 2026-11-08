@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { getGoogleAuthUrl, getGitHubAuthUrl } from '../services/api';
 import { GitHubOAuthSetupModal } from '../components/GitHubOAuthSetupModal';
+import { GoogleOAuthSetupModal } from '../components/GoogleOAuthSetupModal';
 
 interface AuthPageProps {
   onLoginDemo: () => Promise<void>;
@@ -65,6 +66,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showOAuthSetup, setShowOAuthSetup] = useState(false);
+  const [showGoogleOAuthSetup, setShowGoogleOAuthSetup] = useState(false);
   const [showTokenForm, setShowTokenForm] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [isConnectingToken, setIsConnectingToken] = useState(false);
@@ -367,12 +369,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setErrorMsg(null);
     try {
       const res = await getGoogleAuthUrl();
-      if (res.is_configured && res.url) {
+      if (res.is_configured && res.url && !res.url.includes('action=google_setup')) {
         window.location.href = res.url;
       } else {
-        setErrorMsg(
-          'Google OAuth client credentials are not configured in environment (.env). You can explore the 1-Click Demo Sandbox or use a GitHub Token below!'
-        );
+        setShowGoogleOAuthSetup(true);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to initialize Google authentication');
@@ -566,15 +566,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <span>Continue with GitHub (OAuth)</span>
               </button>
 
-              <div className="flex items-center justify-between text-[11px] px-1 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowOAuthSetup(true)}
-                  className="text-[#896EFF] hover:underline flex items-center gap-1"
-                >
-                  <span>Configure OAuth App</span>
-                  <ExternalLink className="w-2.5 h-2.5" />
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-y-1 text-[11px] px-1 pt-1">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowOAuthSetup(true)}
+                    className="text-[#896EFF] hover:underline flex items-center gap-1"
+                  >
+                    <span>Configure GitHub</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGoogleOAuthSetup(true)}
+                    className="text-[#896EFF] hover:underline flex items-center gap-1"
+                  >
+                    <span>Configure Google</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowTokenForm(!showTokenForm)}
@@ -669,6 +679,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           onClose={() => setShowOAuthSetup(false)}
           onConfigured={(authUrl) => {
             setShowOAuthSetup(false);
+            window.location.href = authUrl;
+          }}
+        />
+
+        {/* Google OAuth Setup Modal */}
+        <GoogleOAuthSetupModal
+          isOpen={showGoogleOAuthSetup}
+          onClose={() => setShowGoogleOAuthSetup(false)}
+          onConfigured={(authUrl) => {
+            setShowGoogleOAuthSetup(false);
             window.location.href = authUrl;
           }}
         />
@@ -1774,6 +1794,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         onClose={() => setShowOAuthSetup(false)}
         onConfigured={(authUrl) => {
           setShowOAuthSetup(false);
+          window.location.href = authUrl;
+        }}
+      />
+
+      {/* Google OAuth Setup Modal */}
+      <GoogleOAuthSetupModal
+        isOpen={showGoogleOAuthSetup}
+        onClose={() => setShowGoogleOAuthSetup(false)}
+        onConfigured={(authUrl) => {
+          setShowGoogleOAuthSetup(false);
           window.location.href = authUrl;
         }}
       />

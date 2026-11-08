@@ -5,6 +5,7 @@ and Google/GitHub OAuth state verification.
 
 from fastapi.testclient import TestClient
 from app.main import app
+from app.config import settings
 from app.services.auth_service import auth_service
 from app.db.session_db import db
 
@@ -71,28 +72,73 @@ def test_protected_route_requires_auth():
 
 
 def test_github_config_and_oauth_flow():
-    # 1. Fetch initial config info
-    info_res = client.get("/api/auth/github/config-info")
-    assert info_res.status_code == 200
-    info_data = info_res.json()
-    assert "callback_url" in info_data
-    assert "homepage_url" in info_data
+    orig_cid = settings.GITHUB_CLIENT_ID
+    orig_csec = settings.GITHUB_CLIENT_SECRET
+    try:
+        # 1. Fetch initial config info
+        info_res = client.get("/api/auth/github/config-info")
+        assert info_res.status_code == 200
+        info_data = info_res.json()
+        assert "callback_url" in info_data
+        assert "homepage_url" in info_data
 
-    # 2. Configure GitHub credentials
-    conf_res = client.post(
-        "/api/auth/github/configure",
-        json={"client_id": "test_gh_client_id_12345", "client_secret": "test_gh_secret_67890"},
-    )
-    assert conf_res.status_code == 200
-    conf_data = conf_res.json()
-    assert conf_data["status"] == "configured"
-    assert conf_data["is_configured"] is True
+        # 2. Configure GitHub credentials
+        conf_res = client.post(
+            "/api/auth/github/configure",
+            json={"client_id": "test_gh_client_id_12345", "client_secret": "test_gh_secret_67890"},
+        )
+        assert conf_res.status_code == 200
+        conf_data = conf_res.json()
+        assert conf_data["status"] == "configured"
+        assert conf_data["is_configured"] is True
 
-    # 3. Verify OAuth URL now points to GitHub authorize with client_id
-    url_res = client.get("/api/auth/github/url")
-    assert url_res.status_code == 200
-    url_data = url_res.json()
-    assert url_data["is_configured"] is True
-    assert "github.com/login/oauth/authorize" in url_data["url"]
-    assert "client_id=test_gh_client_id_12345" in url_data["url"]
-    assert "scope=read%3Auser+user%3Aemail+repo" in url_data["url"]
+        # 3. Verify OAuth URL now points to GitHub authorize with client_id
+        url_res = client.get("/api/auth/github/url")
+        assert url_res.status_code == 200
+        url_data = url_res.json()
+        assert url_data["is_configured"] is False  # test_ prefix is correctly treated as non-live test fixture
+        assert "github.com/login/oauth/authorize" in url_data["url"]
+        assert "client_id=test_gh_client_id_12345" in url_data["url"]
+        assert "scope=read%3Auser+user%3Aemail+repo" in url_data["url"]
+    finally:
+        # 4. Teardown: Clean up test keys from db and restore original settings
+        with db._get_connection() as conn:
+            conn.execute("DELETE FROM app_config WHERE key LIKE 'GITHUB_%'")
+            conn.commit()
+        settings.GITHUB_CLIENT_ID = orig_cid
+        settings.GITHUB_CLIENT_SECRET = orig_csec
+
+
+def test_google_config_and_oauth_flow():
+    orig_cid = settings.GOOGLE_CLIENT_ID
+    orig_csec = settings.GOOGLE_CLIENT_SECRET
+    try:
+        info_res = client.get("/api/auth/google/config-info")
+        assert info_res.status_code == 200
+        info_data = info_res.json()
+        assert "callback_url" in info_data
+        assert "setup_url" in info_data
+        assert "origin_urls" in info_data
+
+        conf_res = client.post(
+            "/api/auth/google/configure",
+            json={"client_id": "test_google_client_id_12345.apps.googleusercontent.com", "client_secret": "test_google_secret_67890"},
+        )
+        assert conf_res.status_code == 200
+        conf_data = conf_res.json()
+        assert conf_data["status"] == "configured"
+        assert conf_data["is_configured"] is True
+
+        url_res = client.get("/api/auth/google/url")
+        assert url_res.status_code == 200
+        url_data = url_res.json()
+        assert url_data["is_configured"] is False
+        assert "accounts.google.com/o/oauth2/v2/auth" in url_data["url"]
+        assert "client_id=test_google_client_id_12345.apps.googleusercontent.com" in url_data["url"]
+        assert "scope=openid+email+profile" in url_data["url"]
+    finally:
+        with db._get_connection() as conn:
+            conn.execute("DELETE FROM app_config WHERE key LIKE 'GOOGLE_%'")
+            conn.commit()
+        settings.GOOGLE_CLIENT_ID = orig_cid
+        settings.GOOGLE_CLIENT_SECRET = orig_csec

@@ -37,6 +37,7 @@ import {
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [githubAccount, setGithubAccount] = useState<GitHubAccount | null>(null);
   const [currentTab, setCurrentTab] = useState<string>('overview');
@@ -52,15 +53,23 @@ export function App() {
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
 
-  // Check auth status on launch and handle GitHub redirect
+  // Check auth status on launch and handle GitHub / Google redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ghAuth = params.get('github_auth');
-    if (ghAuth === 'success') {
+    const googleAuth = params.get('google_auth');
+    const token = params.get('token');
+
+    if (token) {
+      localStorage.setItem('regrava_token', token);
+    }
+
+    if (ghAuth === 'success' || googleAuth === 'success' || token) {
       window.history.replaceState({}, document.title, window.location.pathname);
+      setCurrentTab('overview');
       checkAuth();
-    } else if (ghAuth === 'error') {
-      const msg = params.get('msg') || 'GitHub OAuth failed';
+    } else if (ghAuth === 'error' || googleAuth === 'error') {
+      const msg = params.get('msg') || (googleAuth === 'error' ? 'Google OAuth failed' : 'GitHub OAuth failed');
       setAppError(msg);
       window.history.replaceState({}, document.title, window.location.pathname);
       checkAuth();
@@ -76,6 +85,7 @@ export function App() {
         setIsAuthenticated(true);
         setUser(data.user);
         setGithubAccount(data.github_account);
+        setCurrentTab('overview');
         loadInitialData();
       } else {
         setIsAuthenticated(false);
@@ -83,6 +93,8 @@ export function App() {
     } catch {
       // If error or unauthenticated, prompt auth
       setIsAuthenticated(false);
+    } finally {
+      setIsAuthChecking(false);
     }
   };
 
@@ -271,6 +283,18 @@ export function App() {
       setAppError(err.message || 'Failed to update finding status');
     }
   };
+
+  // Loading screen while verifying session/token
+  if (isAuthChecking) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#08090C] text-[#D1D5DC]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-[#7657FF] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-[#666D7C] font-mono tracking-wider">INITIALIZING REGRAVA...</span>
+        </div>
+      </div>
+    );
+  }
 
   // If unauthenticated, show standalone AuthPage
   if (!isAuthenticated) {
