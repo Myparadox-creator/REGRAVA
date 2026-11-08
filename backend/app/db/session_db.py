@@ -82,6 +82,12 @@ class DatabaseManager:
                 FOREIGN KEY (analysis_id) REFERENCES pr_analyses(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS app_config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
             CREATE INDEX IF NOT EXISTS idx_analyses_user ON pr_analyses(user_id);
             CREATE INDEX IF NOT EXISTS idx_analyses_repo ON pr_analyses(repo_name);
@@ -359,6 +365,21 @@ class DatabaseManager:
                 "notes = excluded.notes, "
                 "updated_at = excluded.updated_at",
                 (analysis_id, finding_id, status, notes, now),
+            )
+
+    # --- Persistent Application Configuration (e.g. GitHub OAuth credentials) ---
+    def get_config(self, key: str) -> Optional[str]:
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT value FROM app_config WHERE key = ?", (key,)).fetchone()
+            return row["value"] if row else None
+
+    def set_config(self, key: str, value: str) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO app_config (key, value, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+                (key, value, now),
             )
 
 

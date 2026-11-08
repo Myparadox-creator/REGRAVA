@@ -113,13 +113,17 @@ class AuthService:
         Generate GitHub OAuth authorization URL with signed state.
         Requests permissions to inspect user identity and authorized repositories.
         """
+        client_id = settings.get_github_client_id()
+        client_secret = settings.get_github_client_secret()
         state = self.generate_oauth_state("github")
-        if settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET:
+
+        if client_id and client_secret:
             params = {
-                "client_id": settings.GITHUB_CLIENT_ID,
+                "client_id": client_id,
                 "redirect_uri": settings.GITHUB_REDIRECT_URI,
                 "scope": "read:user user:email repo",
                 "state": state,
+                "allow_signup": "true",
             }
             return f"https://github.com/login/oauth/authorize?{urllib.parse.urlencode(params)}"
         else:
@@ -135,7 +139,10 @@ class AuthService:
         if not self.verify_oauth_state(state, "github"):
             raise HTTPException(status_code=400, detail="Invalid OAuth state parameter.")
 
-        if not (settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET):
+        client_id = settings.get_github_client_id()
+        client_secret = settings.get_github_client_secret()
+
+        if not (client_id and client_secret):
             # Demo/simulated connection fallback
             demo_repos = ["demo-org/payment-service", "demo-org/user-service"]
             target_user_id = user_id or "user-demo-01"
@@ -158,8 +165,8 @@ class AuthService:
             token_res = await client.post(
                 "https://github.com/login/oauth/access_token",
                 data={
-                    "client_id": settings.GITHUB_CLIENT_ID,
-                    "client_secret": settings.GITHUB_CLIENT_SECRET,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
                     "code": code,
                     "redirect_uri": settings.GITHUB_REDIRECT_URI,
                 },

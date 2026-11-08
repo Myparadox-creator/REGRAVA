@@ -67,3 +67,32 @@ def test_protected_route_requires_auth():
     res = unauth_client.get("/api/repos")
     assert res.status_code == 401
     assert "Authentication required" in res.json()["detail"]
+
+
+
+def test_github_config_and_oauth_flow():
+    # 1. Fetch initial config info
+    info_res = client.get("/api/auth/github/config-info")
+    assert info_res.status_code == 200
+    info_data = info_res.json()
+    assert "callback_url" in info_data
+    assert "homepage_url" in info_data
+
+    # 2. Configure GitHub credentials
+    conf_res = client.post(
+        "/api/auth/github/configure",
+        json={"client_id": "test_gh_client_id_12345", "client_secret": "test_gh_secret_67890"},
+    )
+    assert conf_res.status_code == 200
+    conf_data = conf_res.json()
+    assert conf_data["status"] == "configured"
+    assert conf_data["is_configured"] is True
+
+    # 3. Verify OAuth URL now points to GitHub authorize with client_id
+    url_res = client.get("/api/auth/github/url")
+    assert url_res.status_code == 200
+    url_data = url_res.json()
+    assert url_data["is_configured"] is True
+    assert "github.com/login/oauth/authorize" in url_data["url"]
+    assert "client_id=test_gh_client_id_12345" in url_data["url"]
+    assert "scope=read%3Auser+user%3Aemail+repo" in url_data["url"]

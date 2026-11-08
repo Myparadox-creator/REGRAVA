@@ -110,11 +110,48 @@ export async function getGoogleAuthUrl(): Promise<{ url: string; is_configured: 
   );
 }
 
-export async function getGitHubAuthUrl(): Promise<{ url: string; is_configured: boolean; app_name: string }> {
-  return fetchJson<{ url: string; is_configured: boolean; app_name: string }>(
-    `${API_BASE}/auth/github/url`,
-    undefined,
-    'Failed to get GitHub auth URL'
+export async function getGitHubAuthUrl(): Promise<{
+  url: string;
+  is_configured: boolean;
+  app_name: string;
+  callback_url?: string;
+}> {
+  return fetchJson<{
+    url: string;
+    is_configured: boolean;
+    app_name: string;
+    callback_url?: string;
+  }>(`${API_BASE}/auth/github/url`, undefined, 'Failed to get GitHub auth URL');
+}
+
+export async function fetchGitHubConfigInfo(): Promise<{
+  is_configured: boolean;
+  client_id: string | null;
+  callback_url: string;
+  homepage_url: string;
+  setup_url: string;
+}> {
+  return fetchJson<{
+    is_configured: boolean;
+    client_id: string | null;
+    callback_url: string;
+    homepage_url: string;
+    setup_url: string;
+  }>(`${API_BASE}/auth/github/config-info`, undefined, 'Failed to get GitHub config info');
+}
+
+export async function configureGitHubOAuth(
+  clientId: string,
+  clientSecret: string
+): Promise<{ status: string; is_configured: boolean; auth_url: string }> {
+  return fetchJson<{ status: string; is_configured: boolean; auth_url: string }>(
+    `${API_BASE}/auth/github/configure`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+    },
+    'Failed to configure GitHub OAuth'
   );
 }
 

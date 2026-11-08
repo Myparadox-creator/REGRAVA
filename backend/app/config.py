@@ -7,7 +7,13 @@ security scanner limits, and environment options.
 import os
 from pathlib import Path
 from typing import List, Optional
+from dotenv import load_dotenv
 from pydantic import BaseModel
+
+# Load environment variables from .env files
+_project_root = Path(__file__).resolve().parent.parent.parent
+load_dotenv(_project_root / ".env")
+load_dotenv(_project_root / "backend" / ".env")
 
 
 class Settings(BaseModel):
@@ -62,13 +68,35 @@ class Settings(BaseModel):
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
 
+    def get_github_client_id(self) -> Optional[str]:
+        if self.GITHUB_CLIENT_ID:
+            return self.GITHUB_CLIENT_ID
+        try:
+            from app.db.session_db import db
+            return db.get_config("GITHUB_CLIENT_ID")
+        except Exception:
+            return None
+
+    def get_github_client_secret(self) -> Optional[str]:
+        if self.GITHUB_CLIENT_SECRET:
+            return self.GITHUB_CLIENT_SECRET
+        try:
+            from app.db.session_db import db
+            return db.get_config("GITHUB_CLIENT_SECRET")
+        except Exception:
+            return None
+
     @property
     def is_google_configured(self) -> bool:
         return bool(self.GOOGLE_CLIENT_ID and self.GOOGLE_CLIENT_SECRET)
 
     @property
     def is_github_configured(self) -> bool:
-        return bool((self.GITHUB_CLIENT_ID and self.GITHUB_CLIENT_SECRET) or self.GITHUB_TOKEN)
+        return bool(self.is_github_oauth_configured or self.GITHUB_TOKEN)
+
+    @property
+    def is_github_oauth_configured(self) -> bool:
+        return bool(self.get_github_client_id() and self.get_github_client_secret())
 
 
 settings = Settings()

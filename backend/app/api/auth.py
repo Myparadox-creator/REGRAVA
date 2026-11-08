@@ -30,6 +30,11 @@ class GitHubTokenRequest(BaseModel):
     token: str
 
 
+class GitHubConfigureRequest(BaseModel):
+    client_id: str
+    client_secret: str
+
+
 @router.get("/google/url")
 def get_google_auth_url():
     """Return the Google OAuth authorization URL."""
@@ -63,11 +68,74 @@ async def google_callback(request: GoogleCallbackRequest, response: Response):
 
 @router.get("/github/url")
 def get_github_auth_url():
-    """Return the GitHub App authorization URL."""
+    """Return the GitHub App/OAuth authorization URL."""
     return {
         "url": auth_service.get_github_auth_url(),
-        "is_configured": settings.is_github_configured,
+        "is_configured": settings.is_github_oauth_configured,
         "app_name": settings.GITHUB_APP_NAME,
+        "callback_url": settings.GITHUB_REDIRECT_URI,
+    }
+
+
+@router.get("/github/config-info")
+def get_github_config_info():
+    """Return public metadata needed to configure GitHub OAuth App."""
+    client_id = settings.get_github_client_id()
+    masked_client_id = (
+        f"{client_id[:6]}...{client_id[-4:]}" if client_id and len(client_id) > 10 else client_id
+    )
+    return {
+        "is_configured": settings.is_github_oauth_configured,
+        "client_id": masked_client_id,
+        "callback_url": settings.GITHUB_REDIRECT_URI,
+        "homepage_url": settings.GITHUB_FRONTEND_URL,
+        "setup_url": "https://github.com/settings/applications/new",
+    }
+
+
+@router.post("/github/configure")
+def configure_github_oauth(request: GitHubConfigureRequest):
+    """Configure or update GitHub OAuth App credentials in-memory and in SQLite/env."""
+    cid = request.client_id.strip()
+    csec = request.client_secret.strip()
+    if not cid or not csec:
+        raise HTTPException(status_code=400, detail="Client ID and Client Secret are required.")
+
+    db.set_config("GITHUB_CLIENT_ID", cid)
+    db.set_config("GITHUB_CLIENT_SECRET", csec)
+
+    # Persist to .env if writable
+    try:
+        env_path = settings.PROJECT_ROOT / ".env"
+        lines = []
+        if env_path.exists():
+            lines = env_path.read_text(encoding="utf-8").splitlines()
+
+        cid_found = False
+        csec_found = False
+        new_lines = []
+        for line in lines:
+            if line.startswith("GITHUB_CLIENT_ID="):
+                new_lines.append(f"GITHUB_CLIENT_ID={cid}")
+                cid_found = True
+            elif line.startswith("GITHUB_CLIENT_SECRET="):
+                new_lines.append(f"GITHUB_CLIENT_SECRET={csec}")
+                csec_found = True
+            else:
+                new_lines.append(line)
+        if not cid_found:
+            new_lines.append(f"GITHUB_CLIENT_ID={cid}")
+        if not csec_found:
+            new_lines.append(f"GITHUB_CLIENT_SECRET={csec}")
+
+        env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    except Exception:
+        pass
+
+    return {
+        "status": "configured",
+        "is_configured": True,
+        "auth_url": auth_service.get_github_auth_url(),
     }
 
 

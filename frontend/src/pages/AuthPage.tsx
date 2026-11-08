@@ -31,6 +31,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { getGoogleAuthUrl, getGitHubAuthUrl } from '../services/api';
+import { GitHubOAuthSetupModal } from '../components/GitHubOAuthSetupModal';
 
 interface AuthPageProps {
   onLoginDemo: () => Promise<void>;
@@ -63,6 +64,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   });
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showOAuthSetup, setShowOAuthSetup] = useState(false);
   const [showTokenForm, setShowTokenForm] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [isConnectingToken, setIsConnectingToken] = useState(false);
@@ -381,13 +383,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setErrorMsg(null);
     try {
       const res = await getGitHubAuthUrl();
-      if (res.is_configured && res.url) {
+      if (res.is_configured && res.url && !res.url.includes('action=github_setup')) {
         window.location.href = res.url;
       } else {
-        setErrorMsg(
-          'GitHub App credentials are not configured in environment (.env). You can sign in directly using a GitHub Token below, or explore the 1-Click Demo Sandbox!'
-        );
-        setShowTokenForm(true);
+        setShowOAuthSetup(true);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to initialize GitHub authentication');
@@ -558,30 +557,39 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <span>Continue with Google</span>
               </button>
 
-              {/* GitHub Login */}
+              {/* Real GitHub OAuth Login */}
               <button
                 onClick={handleGitHubLogin}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors"
+                className="w-full py-2.5 px-4 rounded-xl bg-[#211A35] hover:bg-[#2C2248] border border-[#48366F] text-[#F5F6F8] text-xs font-semibold flex items-center justify-center gap-2.5 transition-all shadow-md active:scale-95"
               >
                 <Github className="w-4 h-4 text-white" />
-                <span>Continue with GitHub</span>
+                <span>Continue with GitHub (OAuth)</span>
               </button>
 
-              {/* Direct GitHub Token (PAT) Option */}
-              <div className="pt-2 border-t border-[#1C2028]">
+              <div className="flex items-center justify-between text-[11px] px-1 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowOAuthSetup(true)}
+                  className="text-[#896EFF] hover:underline flex items-center gap-1"
+                >
+                  <span>Configure OAuth App</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowTokenForm(!showTokenForm)}
-                  className="w-full text-center text-xs text-[#896EFF] hover:text-[#7657FF] font-medium flex items-center justify-center gap-1.5 py-1 transition-colors"
+                  className="text-[#707783] hover:text-[#9299A5]"
                 >
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>{showTokenForm ? 'Hide Token Sign-In' : 'Or Sign In with GitHub Token (PAT)'}</span>
+                  {showTokenForm ? 'Hide Token' : 'Or use manual token'}
                 </button>
+              </div>
 
-                {showTokenForm && (
+              {/* Direct GitHub Token (PAT) Option (Collapsible) */}
+              {showTokenForm && (
+                <div className="pt-2 border-t border-[#1C2028]">
                   <form
                     onSubmit={handleTokenSubmit}
-                    className="mt-3 space-y-3 p-4 rounded-xl bg-[#0B0D11] border border-[#252932]"
+                    className="space-y-3 p-4 rounded-xl bg-[#0B0D11] border border-[#252932]"
                   >
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-[#D1D5DC]">Personal Access Token</span>
@@ -604,13 +612,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     />
 
                     <p className="text-[10px] text-[#707783] leading-relaxed">
-                      Instantly load and scan your real public or private repositories without configuring GitHub OAuth.
+                      Manual fallback to scan repositories without configuring GitHub OAuth.
                     </p>
 
                     <button
                       type="submit"
                       disabled={isConnectingToken || !tokenInput.trim()}
-                      className="w-full py-2.5 px-3 rounded-lg bg-[#7657FF] hover:bg-[#896EFF] text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                      className="w-full py-2.5 px-3 rounded-lg bg-[#1B1F27] hover:bg-[#252932] border border-[#252932] text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                     >
                       {isConnectingToken ? (
                         <>
@@ -625,8 +633,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                       )}
                     </button>
                   </form>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Trust Badges */}
@@ -654,6 +662,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <footer className="relative z-10 px-8 py-4 border-t border-[#1C2028] text-center text-xs text-[#707783]">
           &copy; {new Date().getFullYear()} REGRAVA Platform &bull; Zero-Retention Security Architecture
         </footer>
+
+        {/* GitHub OAuth Setup Modal */}
+        <GitHubOAuthSetupModal
+          isOpen={showOAuthSetup}
+          onClose={() => setShowOAuthSetup(false)}
+          onConfigured={(authUrl) => {
+            setShowOAuthSetup(false);
+            window.location.href = authUrl;
+          }}
+        />
       </div>
     );
   }
@@ -1749,6 +1767,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           </div>
         </div>
       </footer>
+
+      {/* GitHub OAuth Setup Modal */}
+      <GitHubOAuthSetupModal
+        isOpen={showOAuthSetup}
+        onClose={() => setShowOAuthSetup(false)}
+        onConfigured={(authUrl) => {
+          setShowOAuthSetup(false);
+          window.location.href = authUrl;
+        }}
+      />
     </div>
   );
 };

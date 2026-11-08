@@ -15,6 +15,8 @@ import {
   LogOut,
 } from 'lucide-react';
 import { UserProfile, GitHubAccount } from '../types';
+import { getGitHubAuthUrl } from '../services/api';
+import { GitHubOAuthSetupModal } from '../components/GitHubOAuthSetupModal';
 
 interface SettingsPageProps {
   user: UserProfile | null;
@@ -34,6 +36,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onDisconnectGitHub,
 }) => {
   const isGitHubConnected = !!(githubAccount && githubAccount.github_username);
+  const [showOAuthSetup, setShowOAuthSetup] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [isConnectingToken, setIsConnectingToken] = useState(false);
   const [tokenSuccessMsg, setTokenSuccessMsg] = useState<string | null>(null);
@@ -172,8 +175,55 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             </div>
           )}
 
-          {/* Token Connection Form */}
-          <form onSubmit={handleTokenSubmit} className="space-y-2 pt-1 border-t border-[#1C2028]">
+          {/* GitHub OAuth Connection Actions */}
+          <div className="space-y-2 pt-2 border-t border-[#1C2028]">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-[#F5F6F8]">
+              <span>Official GitHub OAuth</span>
+              <button
+                type="button"
+                onClick={() => setShowOAuthSetup(true)}
+                className="text-[10px] text-[#896EFF] hover:underline flex items-center gap-1"
+              >
+                <span>Configure OAuth App</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await getGitHubAuthUrl();
+                    if (res.is_configured && res.url && !res.url.includes('action=github_setup')) {
+                      window.location.href = res.url;
+                    } else {
+                      setShowOAuthSetup(true);
+                    }
+                  } catch {
+                    setShowOAuthSetup(true);
+                  }
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-[#211A35] hover:bg-[#2C2248] border border-[#48366F] text-[#F5F6F8] font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95"
+              >
+                <Github className="w-4 h-4 text-white" />
+                <span>{isGitHubConnected ? 'Re-authorize GitHub OAuth' : 'Connect via GitHub OAuth'}</span>
+              </button>
+
+              {isGitHubConnected && onDisconnectGitHub && (
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  className="px-3 py-2 rounded-xl bg-[#1B1F27] hover:bg-[#F04452]/20 hover:text-[#F04452] border border-[#252932] text-[#9299A5] text-xs transition-colors"
+                >
+                  Unlink
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Token Connection Form (Alternative/Advanced) */}
+          <form onSubmit={handleTokenSubmit} className="space-y-2 pt-2 border-t border-[#1C2028]">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-semibold text-[#D1D5DC] flex items-center gap-1.5">
                 <KeyRound className="w-3.5 h-3.5 text-[#896EFF]" />
@@ -318,6 +368,16 @@ regrava scan --repo . --base origin/main --head HEAD --format markdown --output 
 regrava scan --repo . --fail-on high`}</code>
         </pre>
       </div>
+
+      {/* GitHub OAuth Setup Modal */}
+      <GitHubOAuthSetupModal
+        isOpen={showOAuthSetup}
+        onClose={() => setShowOAuthSetup(false)}
+        onConfigured={(authUrl) => {
+          setShowOAuthSetup(false);
+          window.location.href = authUrl;
+        }}
+      />
     </div>
   );
 };
