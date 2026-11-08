@@ -11,6 +11,7 @@ from app.api.demo import router as demo_router
 from app.api.health import router as health_router
 from app.api.pull_requests import router as pr_router
 from app.api.security import router as security_router
+from app.api.ai_steering import router as ai_steering_router
 from app.config import settings
 
 app = FastAPI(
@@ -38,6 +39,7 @@ app.include_router(pr_router, prefix="/api")
 app.include_router(security_router, prefix="/api")
 app.include_router(demo_router, prefix="/api")
 app.include_router(analysis_router, prefix="/api")
+app.include_router(ai_steering_router, prefix="/api")
 
 
 @app.get("/")

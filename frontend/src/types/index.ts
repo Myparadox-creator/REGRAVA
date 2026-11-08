@@ -234,3 +234,46 @@ export interface FleetSecurityPosture {
   };
   repositories: RepositorySecurityHealth[];
 }
+
+export type TargetAITool = 'cursor' | 'claude_code' | 'copilot' | 'windsurf' | 'generic';
+
+export interface SteeredPromptResponse {
+  finding_id: string;
+  target_tool: TargetAITool;
+  prompt_text: string;
+  target_files: string[];
+  constraints: string[];
+  suggested_command?: string;
+  synthesized_test_snippet?: string;
+  suggested_patch_diff?: string;
+}
+
+export type AIAuditVerdict =
+  | 'verified_sound'
+  | 'hallucinated_api'
+  | 'contract_regression'
+  | 'security_risk'
+  | 'cosmetic_noise';
+
+export interface AIAuditItem {
+  id: string;
+  source_bot: string;
+  comment_body: string;
+  target_file: string;
+  target_line?: number;
+  verdict: AIAuditVerdict;
+  explanation: string;
+  ast_evidence: string[];
+  suggested_action: string;
+}
+
+export interface AIAuditReport {
+  pr_number?: number;
+  total_audited: number;
+  sound_count: number;
+  hallucination_count: number;
+  regression_count: number;
+  security_risk_count: number;
+  noise_count: number;
+  items: AIAuditItem[];
+}

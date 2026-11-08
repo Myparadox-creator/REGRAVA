@@ -9,6 +9,9 @@ import {
   DemoScenario,
   FleetSecurityPosture,
   RepositorySecurityHealth,
+  TargetAITool,
+  SteeredPromptResponse,
+  AIAuditReport,
 } from '../types';
 
 const API_BASE = '/api';
@@ -261,5 +264,46 @@ export async function triggerRepositoryAudit(owner: string, repo: string): Promi
     `${API_BASE}/security/audit/${owner}/${repo}`,
     { method: 'POST' },
     `Failed to audit repository ${owner}/${repo}`
+  );
+}
+
+export async function fetchSteeredPrompt(
+  analysisId: string,
+  findingId: string,
+  targetTool: TargetAITool = 'cursor',
+  includeTest = true,
+  includeConstraints = true
+): Promise<SteeredPromptResponse> {
+  return fetchJson<SteeredPromptResponse>(
+    `${API_BASE}/analysis/${encodeURIComponent(analysisId)}/findings/${encodeURIComponent(
+      findingId
+    )}/steer-prompt`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        target_tool: targetTool,
+        include_test_assertion: includeTest,
+        include_negative_constraints: includeConstraints,
+      }),
+    },
+    'Failed to generate AI steered prompt'
+  );
+}
+
+export async function auditAIReviews(payload: {
+  pr_number?: number;
+  raw_comment_text?: string;
+  comments?: Array<Record<string, any>>;
+  diff_context?: string;
+}): Promise<AIAuditReport> {
+  return fetchJson<AIAuditReport>(
+    `${API_BASE}/ai/audit-review`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to audit AI bot reviews'
   );
 }

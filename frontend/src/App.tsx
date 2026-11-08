@@ -408,9 +408,10 @@ export function App() {
         </main>
       </div>
 
-      {/* Finding Detail Modal with Triage */}
+      {/* Finding Detail Modal with Triage & AI Prompt Steering */}
       <FindingDetailModal
         finding={selectedFinding}
+        analysisId={currentAnalysis?.id}
         onClose={() => setSelectedFinding(null)}
         onUpdateStatus={handleUpdateFindingStatus}
       />
