@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Unified analysis service for RepoSentinel.
 Orchestrates Git reading, AST parsing, contract extraction, comparison,
@@ -9,7 +10,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from app.analyzer.contract_comparator import ContractComparator
 from app.analyzer.contract_extractor import ContractExtractor
 from app.analyzer.dependency_analyzer import DependencyAnalyzer
