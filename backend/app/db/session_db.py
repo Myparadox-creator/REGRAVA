@@ -5,9 +5,12 @@ sessions, authorized GitHub repositories, and PR analysis history.
 """
 
 import json
+import os
 import sqlite3
+import tempfile
 import uuid
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 from app.config import settings
 
@@ -15,16 +18,37 @@ from app.config import settings
 class DatabaseManager:
     def __init__(self, db_path=None):
         self.db_path = str(db_path or settings.DATABASE_PATH)
+        self._ensure_writable_db()
         self._init_tables()
 
+    def _fallback_db_path(self) -> str:
+        try:
+            temp_db = Path(tempfile.gettempdir()) / "regrava.db"
+            temp_db.parent.mkdir(parents=True, exist_ok=True)
+            return str(temp_db)
+        except Exception:
+            return ":memory:"
+
+    def _ensure_writable_db(self) -> None:
+        try:
+            if self.db_path != ":memory:":
+                Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            self.db_path = self._fallback_db_path()
+
     def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=10.0)
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            return conn
+        except (sqlite3.OperationalError, OSError, PermissionError):
+            self.db_path = self._fallback_db_path()
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            return conn
 
     def _init_tables(self) -> None:
-        with self._get_connection() as conn:
-            conn.executescript("""
+        table_sql = """
             CREATE TABLE IF NOT EXISTS users (
                 id TEXT PRIMARY KEY,
                 email TEXT UNIQUE NOT NULL,
@@ -91,7 +115,14 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
             CREATE INDEX IF NOT EXISTS idx_analyses_user ON pr_analyses(user_id);
             CREATE INDEX IF NOT EXISTS idx_analyses_repo ON pr_analyses(repo_name);
-            """)
+        """
+        try:
+            with self._get_connection() as conn:
+                conn.executescript(table_sql)
+        except Exception:
+            self.db_path = self._fallback_db_path()
+            with self._get_connection() as conn:
+                conn.executescript(table_sql)
 
     # --- User Management ---
     def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:

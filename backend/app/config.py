@@ -5,15 +5,57 @@ security scanner limits, and environment options.
 """
 
 import os
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-# Load environment variables from .env files
-_project_root = Path(__file__).resolve().parent.parent.parent
+_current_file = Path(__file__).resolve()
+# Support both local monorepo (reposentinel/backend/app/config.py)
+# and isolated serverless deployment (backend/app/config.py where backend is root)
+if (_current_file.parent.parent.parent / "backend").exists():
+    _project_root = _current_file.parent.parent.parent
+elif (_current_file.parent.parent / "app").exists():
+    _project_root = _current_file.parent.parent
+else:
+    _project_root = _current_file.parent.parent.parent
+
 load_dotenv(_project_root / ".env")
-load_dotenv(_project_root / "backend" / ".env")
+if (_project_root / "backend").exists():
+    load_dotenv(_project_root / "backend" / ".env")
+
+
+def _resolve_default_db_path() -> str:
+    env_path = os.getenv("REGRAVA_DATABASE_PATH")
+    if env_path:
+        return env_path
+
+    is_serverless = any(
+        k in os.environ
+        for k in [
+            "VERCEL",
+            "VERCEL_ENV",
+            "VERCEL_URL",
+            "VERCEL_REGION",
+            "AWS_LAMBDA_FUNCTION_NAME",
+            "LAMBDA_TASK_ROOT",
+            "NOW_REGION",
+        ]
+    )
+    if is_serverless:
+        return str(Path(tempfile.gettempdir()) / "regrava.db")
+
+    local_backend = _project_root / "backend" if (_project_root / "backend").exists() else _project_root
+    local_db = local_backend / "regrava.db"
+    try:
+        local_db.parent.mkdir(parents=True, exist_ok=True)
+        test_file = local_db.parent / ".regrava_write_test"
+        test_file.touch()
+        test_file.unlink()
+        return str(local_db)
+    except Exception:
+        return str(Path(tempfile.gettempdir()) / "regrava.db")
 
 
 class Settings(BaseModel):
@@ -21,18 +63,11 @@ class Settings(BaseModel):
     APP_TAGLINE: str = "Catch what your diff could break."
     APP_VERSION: str = "2.0.0"
 
-    PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
+    PROJECT_ROOT: Path = _project_root
     WORKSPACES_DIR: Path = PROJECT_ROOT / "workspaces"
     EXAMPLES_DIR: Path = PROJECT_ROOT / "examples" / "demo_project"
     ANALYZER_TS_DIR: Path = PROJECT_ROOT / "analyzer_ts"
-    DATABASE_PATH: Path = Path(
-        os.getenv("REGRAVA_DATABASE_PATH")
-        or (
-            "/tmp/regrava.db"
-            if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
-            else str(PROJECT_ROOT / "backend" / "regrava.db")
-        )
-    )
+    DATABASE_PATH: Path = Path(_resolve_default_db_path())
 
     # Scanner limits
     MAX_FILE_SIZE_BYTES: int = 1_048_576  # 1 MB
