@@ -3,7 +3,10 @@ FastAPI application entry point for REGRAVA.
 Evidence-Based Pull-Request Security and Regression Analysis Platform.
 """
 
-from fastapi import FastAPI
+import sys
+import traceback
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.analysis import router as analysis_router
 from app.api.auth import router as auth_router
@@ -23,6 +26,15 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    err = traceback.format_exc()
+    print("UNCAUGHT API EXCEPTION:\n" + err, file=sys.stderr, flush=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "traceback": err},
+    )
+
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
@@ -33,14 +45,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount API routers
-app.include_router(health_router, prefix="/api")
-app.include_router(auth_router, prefix="/api")
-app.include_router(pr_router, prefix="/api")
-app.include_router(security_router, prefix="/api")
-app.include_router(demo_router, prefix="/api")
-app.include_router(analysis_router, prefix="/api")
-app.include_router(ai_steering_router, prefix="/api")
+# Mount API routers (both with /api prefix and at root for full proxy compatibility)
+routers = [
+    health_router,
+    auth_router,
+    pr_router,
+    security_router,
+    demo_router,
+    analysis_router,
+    ai_steering_router,
+]
+
+for r in routers:
+    app.include_router(r, prefix="/api")
+    app.include_router(r)
 
 
 @app.get("/")
