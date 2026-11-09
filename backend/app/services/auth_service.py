@@ -43,7 +43,7 @@ class AuthService:
             return False
 
     # --- Google OAuth Flow ---
-    def get_google_auth_url(self) -> str:
+    def get_google_auth_url(self, redirect_uri: Optional[str] = None) -> str:
         cid = settings.get_google_client_id()
         csec = settings.get_google_client_secret()
         state = self.generate_oauth_state("google")
@@ -51,7 +51,7 @@ class AuthService:
         if cid and csec:
             params = {
                 "client_id": cid,
-                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                "redirect_uri": redirect_uri or settings.GOOGLE_REDIRECT_URI,
                 "response_type": "code",
                 "scope": "openid email profile",
                 "state": state,
@@ -63,7 +63,11 @@ class AuthService:
         return "/login?action=google_setup"
 
     async def handle_google_callback(
-        self, code: str, state: str, user_id: Optional[str] = None
+        self,
+        code: str,
+        state: str,
+        user_id: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
     ) -> Dict[str, Any]:
         if not self.verify_oauth_state(state, "google"):
             raise HTTPException(status_code=400, detail="Invalid or expired OAuth state parameter (CSRF detected).")
@@ -79,7 +83,7 @@ class AuthService:
             "client_secret": csec,
             "code": code,
             "grant_type": "authorization_code",
-            "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+            "redirect_uri": redirect_uri or settings.GOOGLE_REDIRECT_URI,
         }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -128,7 +132,7 @@ class AuthService:
             return {"user": user, "session_token": session_token}
 
     # --- GitHub App & OAuth Connection Flow ---
-    def get_github_auth_url(self) -> str:
+    def get_github_auth_url(self, redirect_uri: Optional[str] = None) -> str:
         """
         Generate GitHub OAuth authorization URL with signed state.
         Requests permissions to inspect user identity and authorized repositories.
@@ -140,7 +144,7 @@ class AuthService:
         if client_id and client_secret:
             params = {
                 "client_id": client_id,
-                "redirect_uri": settings.GITHUB_REDIRECT_URI,
+                "redirect_uri": redirect_uri or settings.GITHUB_REDIRECT_URI,
                 "scope": "read:user user:email repo",
                 "state": state,
                 "allow_signup": "true",
@@ -150,7 +154,12 @@ class AuthService:
             return f"/settings?action=github_setup&state={state}"
 
     async def handle_github_callback(
-        self, user_id: Optional[str], code: str, state: str, installation_id: Optional[str] = None
+        self,
+        user_id: Optional[str],
+        code: str,
+        state: str,
+        installation_id: Optional[str] = None,
+        redirect_uri: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Exchange GitHub OAuth code for access token.
@@ -188,7 +197,7 @@ class AuthService:
                     "client_id": client_id,
                     "client_secret": client_secret,
                     "code": code,
-                    "redirect_uri": settings.GITHUB_REDIRECT_URI,
+                    "redirect_uri": redirect_uri or settings.GITHUB_REDIRECT_URI,
                 },
                 headers={"Accept": "application/json"},
             )

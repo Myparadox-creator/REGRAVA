@@ -25,7 +25,14 @@ class Settings(BaseModel):
     WORKSPACES_DIR: Path = PROJECT_ROOT / "workspaces"
     EXAMPLES_DIR: Path = PROJECT_ROOT / "examples" / "demo_project"
     ANALYZER_TS_DIR: Path = PROJECT_ROOT / "analyzer_ts"
-    DATABASE_PATH: Path = PROJECT_ROOT / "backend" / "regrava.db"
+    DATABASE_PATH: Path = Path(
+        os.getenv("REGRAVA_DATABASE_PATH")
+        or (
+            "/tmp/regrava.db"
+            if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+            else str(PROJECT_ROOT / "backend" / "regrava.db")
+        )
+    )
 
     # Scanner limits
     MAX_FILE_SIZE_BYTES: int = 1_048_576  # 1 MB
@@ -40,13 +47,20 @@ class Settings(BaseModel):
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+    ] + [
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", "").split(",")
+        if origin.strip()
     ]
 
     # Session & Security
     SECRET_KEY: str = os.getenv("REGRAVA_SECRET_KEY", "regrava-dev-secret-key-change-in-production-32bytes-min")
     SESSION_COOKIE_NAME: str = "regrava_session"
     SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 7  # 7 days
-    COOKIE_SECURE: bool = os.getenv("REGRAVA_COOKIE_SECURE", "false").lower() == "true"
+    COOKIE_SECURE: bool = (
+        os.getenv("REGRAVA_COOKIE_SECURE", "true" if os.getenv("VERCEL") else "false").lower()
+        == "true"
+    )
     COOKIE_SAMESITE: str = "lax"
 
     # Google OAuth

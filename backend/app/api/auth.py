@@ -42,28 +42,62 @@ class GitHubConfigureRequest(BaseModel):
     client_secret: str
 
 
+def _get_base_and_callback(request: Request, default_callback: str, default_frontend: str, callback_path: str):
+    host = request.headers.get("host", "")
+    proto = request.headers.get(
+        "x-forwarded-proto",
+        "http" if "127.0.0.1" in host or "localhost" in host else "https",
+    )
+    if host and "127.0.0.1" not in host and "localhost" not in host:
+        frontend_base = f"{proto}://{host}"
+        callback_url = f"{proto}://{host}{callback_path}"
+    else:
+        frontend_base = default_frontend.rstrip("/")
+        if "127.0.0.1" in host and "localhost" in frontend_base:
+            frontend_base = frontend_base.replace("localhost", "127.0.0.1")
+        elif "localhost" in host and "127.0.0.1" in frontend_base:
+            frontend_base = frontend_base.replace("127.0.0.1", "localhost")
+        callback_url = default_callback
+        if "127.0.0.1" in host and "localhost" in callback_url:
+            callback_url = callback_url.replace("localhost", "127.0.0.1")
+        elif "localhost" in host and "127.0.0.1" in callback_url:
+            callback_url = callback_url.replace("127.0.0.1", "localhost")
+    return frontend_base, callback_url
+
+
 @router.get("/google/url")
-def get_google_auth_url():
+def get_google_auth_url(request: Request):
     """Return the Google OAuth authorization URL."""
+    _, callback_url = _get_base_and_callback(
+        request, settings.GOOGLE_REDIRECT_URI, settings.GITHUB_FRONTEND_URL, "/api/auth/google/callback"
+    )
     return {
-        "url": auth_service.get_google_auth_url(),
+        "url": auth_service.get_google_auth_url(redirect_uri=callback_url),
         "is_configured": settings.is_google_configured,
-        "callback_url": settings.GOOGLE_REDIRECT_URI,
+        "callback_url": callback_url,
     }
 
 
 @router.get("/google/config-info")
-def get_google_config_info():
+def get_google_config_info(request: Request):
     """Return public metadata needed to configure Google OAuth credentials."""
     client_id = settings.get_google_client_id()
     masked_client_id = (
         f"{client_id[:8]}...{client_id[-8:]}" if client_id and len(client_id) > 16 else client_id
     )
+    frontend_base, callback_url = _get_base_and_callback(
+        request, settings.GOOGLE_REDIRECT_URI, settings.GITHUB_FRONTEND_URL, "/api/auth/google/callback"
+    )
+    origin_urls = (
+        [frontend_base]
+        if "127.0.0.1" not in frontend_base and "localhost" not in frontend_base
+        else ["http://localhost:5173", "http://127.0.0.1:5173"]
+    )
     return {
         "is_configured": settings.is_google_configured,
         "client_id": masked_client_id,
-        "callback_url": settings.GOOGLE_REDIRECT_URI,
-        "origin_urls": ["http://localhost:5173", "http://127.0.0.1:5173"],
+        "callback_url": callback_url,
+        "origin_urls": origin_urls,
         "setup_url": "https://console.cloud.google.com/apis/credentials/oauthclient",
     }
 
@@ -129,12 +163,9 @@ async def google_browser_callback(
     Handle browser redirect from Google OAuth authorization.
     Exchanges authorization code, sets session cookie and token, and redirects user to frontend dashboard.
     """
-    host = request.headers.get("host", "")
-    frontend_base = settings.GITHUB_FRONTEND_URL.rstrip("/")
-    if "127.0.0.1" in host and "localhost" in frontend_base:
-        frontend_base = frontend_base.replace("localhost", "127.0.0.1")
-    elif "localhost" in host and "127.0.0.1" in frontend_base:
-        frontend_base = frontend_base.replace("127.0.0.1", "localhost")
+    frontend_base, callback_url = _get_base_and_callback(
+        request, settings.GOOGLE_REDIRECT_URI, settings.GITHUB_FRONTEND_URL, "/api/auth/google/callback"
+    )
 
     if error or not code:
         err_msg = error_description or error or "Google authorization was canceled or failed."
@@ -151,6 +182,7 @@ async def google_browser_callback(
             code=code,
             state=state or "",
             user_id=user_id,
+            redirect_uri=callback_url,
         )
 
         session_token = result.get("session_token")
@@ -215,28 +247,34 @@ async def google_callback(
 
 
 @router.get("/github/url")
-def get_github_auth_url():
+def get_github_auth_url(request: Request):
     """Return the GitHub App/OAuth authorization URL."""
+    _, callback_url = _get_base_and_callback(
+        request, settings.GITHUB_REDIRECT_URI, settings.GITHUB_FRONTEND_URL, "/api/auth/github/callback"
+    )
     return {
-        "url": auth_service.get_github_auth_url(),
+        "url": auth_service.get_github_auth_url(redirect_uri=callback_url),
         "is_configured": settings.is_github_oauth_configured,
         "app_name": settings.GITHUB_APP_NAME,
-        "callback_url": settings.GITHUB_REDIRECT_URI,
+        "callback_url": callback_url,
     }
 
 
 @router.get("/github/config-info")
-def get_github_config_info():
+def get_github_config_info(request: Request):
     """Return public metadata needed to configure GitHub OAuth App."""
     client_id = settings.get_github_client_id()
     masked_client_id = (
         f"{client_id[:6]}...{client_id[-4:]}" if client_id and len(client_id) > 10 else client_id
     )
+    frontend_base, callback_url = _get_base_and_callback(
+        request, settings.GITHUB_REDIRECT_URI, settings.GITHUB_FRONTEND_URL, "/api/auth/github/callback"
+    )
     return {
         "is_configured": settings.is_github_oauth_configured,
         "client_id": masked_client_id,
-        "callback_url": settings.GITHUB_REDIRECT_URI,
-        "homepage_url": settings.GITHUB_FRONTEND_URL,
+        "callback_url": callback_url,
+        "homepage_url": frontend_base,
         "setup_url": "https://github.com/settings/applications/new",
     }
 
@@ -306,13 +344,9 @@ async def github_browser_callback(
     Handle browser redirect from GitHub OAuth authorization.
     Exchanges authorization code, sets session cookie and token, and redirects user to frontend dashboard.
     """
-    # Determine the best matching frontend origin (127.0.0.1 vs localhost)
-    host = request.headers.get("host", "")
-    frontend_base = settings.GITHUB_FRONTEND_URL.rstrip("/")
-    if "127.0.0.1" in host and "localhost" in frontend_base:
-        frontend_base = frontend_base.replace("localhost", "127.0.0.1")
-    elif "localhost" in host and "127.0.0.1" in frontend_base:
-        frontend_base = frontend_base.replace("127.0.0.1", "localhost")
+    frontend_base, callback_url = _get_base_and_callback(
+        request, settings.GITHUB_REDIRECT_URI, settings.GITHUB_FRONTEND_URL, "/api/auth/github/callback"
+    )
 
     if error or not code:
         err_msg = error_description or error or "GitHub authorization was canceled or failed."
@@ -330,6 +364,7 @@ async def github_browser_callback(
             code=code,
             state=state or "",
             installation_id=installation_id,
+            redirect_uri=callback_url,
         )
 
         session_token = result.get("session_token")
