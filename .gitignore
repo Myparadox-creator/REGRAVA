@@ -45,6 +45,9 @@ dist-ssr/
 htmlcov/
 *.log
 *.db
+examples/demo_project/git_repo/*
+examples/demo_project/git_repo/.*
+!examples/demo_project/git_repo/.gitkeep
 
 # OS
 .DS_Store
