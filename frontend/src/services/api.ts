@@ -99,11 +99,15 @@ export async function fetchAuthStatus(): Promise<{
 }
 
 export async function loginDemo(): Promise<{ status: string; user: UserProfile; token: string }> {
-  return fetchJson<{ status: string; user: UserProfile; token: string }>(
+  const data = await fetchJson<{ status: string; user: UserProfile; token: string }>(
     `${API_BASE}/auth/demo-login`,
     { method: 'POST' },
     'Demo login failed'
   );
+  if (data?.token) {
+    localStorage.setItem('regrava_token', data.token);
+  }
+  return data;
 }
 
 export async function logout(): Promise<{ status: string }> {
@@ -205,12 +209,14 @@ export async function configureGitHubOAuth(
 
 export async function connectGitHubToken(token: string): Promise<{
   status: string;
+  token?: string;
   github_username: string;
   authorized_repos: string[];
   user?: UserProfile;
 }> {
-  return fetchJson<{
+  const data = await fetchJson<{
     status: string;
+    token?: string;
     github_username: string;
     authorized_repos: string[];
     user?: UserProfile;
@@ -223,6 +229,10 @@ export async function connectGitHubToken(token: string): Promise<{
     },
     'Failed to connect GitHub token'
   );
+  if (data?.token) {
+    localStorage.setItem('regrava_token', data.token);
+  }
+  return data;
 }
 
 export async function disconnectGitHub(): Promise<{ status: string }> {

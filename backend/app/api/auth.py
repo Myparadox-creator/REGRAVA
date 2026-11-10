@@ -426,6 +426,7 @@ async def github_callback(
 
     return {
         "status": "connected",
+        "token": session_token,
         "github_username": result.get("github_username"),
         "authorized_repos": result.get("authorized_repos", []),
         "is_live": result.get("is_live", False),
@@ -462,6 +463,7 @@ async def connect_github_token(
 
     return {
         "status": "connected",
+        "token": session_token,
         "github_username": result.get("github_username"),
         "authorized_repos": result.get("authorized_repos", []),
         "is_live": True,
