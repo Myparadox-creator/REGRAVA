@@ -3,6 +3,7 @@ import {
   LogOut,
   Sparkles,
   Github,
+  Menu,
 } from 'lucide-react';
 import { UserProfile, GitHubAccount } from '../types';
 
@@ -12,6 +13,7 @@ interface HeaderProps {
   onLogout: () => void;
   onOpenGitHubSetup: () => void;
   onSwitchToDemo: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,46 +22,57 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onOpenGitHubSetup,
   onSwitchToDemo,
+  onToggleMobileMenu,
 }) => {
   const isConnected = !!(githubAccount && githubAccount.github_username);
 
   return (
-    <header className="h-16 bg-[#0B0D11] border-b border-[#1C2028] px-6 flex items-center justify-between shrink-0 select-none">
-      {/* Brand & Tagline */}
-      <div className="flex items-center gap-3">
+    <header className="h-16 bg-[#0B0D11] border-b border-[#1C2028] px-3 sm:px-6 flex items-center justify-between shrink-0 select-none safe-top">
+      {/* Brand & Mobile Hamburger */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {onToggleMobileMenu && (
+          <button
+            onClick={onToggleMobileMenu}
+            className="p-2 -ml-1 rounded-xl text-[#9299A5] hover:text-[#F5F6F8] hover:bg-[#15181F] md:hidden transition-colors border border-transparent hover:border-[#252932]"
+            aria-label="Toggle navigation drawer"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
         <img
           src="/regrava-icon.png"
           alt="REGRAVA"
-          className="w-8 h-8 rounded-lg object-contain shadow-sm border border-[#252932] bg-[#08090C]"
+          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg object-contain shadow-sm border border-[#252932] bg-[#08090C]"
         />
         <div>
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-[#F5F6F8] text-base tracking-tight font-sans">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="font-bold text-[#F5F6F8] text-sm sm:text-base tracking-tight font-sans">
               REGRAVA
             </span>
-            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#15181F] text-[#9299A5] border border-[#252932]">
+            <span className="text-[9px] sm:text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-[#15181F] text-[#9299A5] border border-[#252932]">
               v2.0
             </span>
             {user?.is_demo && (
-              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 flex items-center gap-1">
+              <span className="text-[9px] sm:text-[10px] font-semibold uppercase px-1.5 sm:px-2 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 flex items-center gap-1">
                 <Sparkles className="w-2.5 h-2.5" />
-                Demo Mode
+                <span className="hidden xs:inline">Demo</span>
               </span>
             )}
           </div>
-          <div className="text-[11px] text-[#707783] font-medium">
+          <div className="hidden sm:block text-[11px] text-[#707783] font-medium truncate max-w-[280px] lg:max-w-none">
             Review &bull; Track &bull; Verify &bull; Merge with Confidence
           </div>
         </div>
       </div>
 
       {/* User & GitHub Connection Status */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {user ? (
           <>
             {/* GitHub Account Badge */}
             {isConnected ? (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111318] border border-[#252932] text-xs">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#111318] border border-[#252932] text-xs">
                 <Github className="w-3.5 h-3.5 text-[#D1D5DC]" />
                 <span className="text-[#D1D5DC] font-mono text-[11px]">
                   @{githubAccount?.github_username}
@@ -69,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <button
                 onClick={onOpenGitHubSetup}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#15181F] hover:bg-[#1B1F27] text-[#F5F6F8] border border-[#252932] text-xs font-medium transition-colors"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] text-[#F5F6F8] border border-[#252932] text-xs font-medium transition-colors"
               >
                 <Github className="w-3.5 h-3.5" />
                 <span>Connect GitHub</span>
@@ -77,7 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* User Profile Pill */}
-            <div className="flex items-center gap-2.5 pl-3 border-l border-[#1C2028]">
+            <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-[#1C2028]">
               {user.avatar_url ? (
                 <img
                   src={user.avatar_url}
@@ -90,8 +103,8 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
               <div className="hidden md:block text-left text-xs">
-                <div className="font-semibold text-[#F5F6F8] leading-none">{user.name}</div>
-                <div className="text-[10px] text-[#707783] leading-tight mt-0.5">{user.email}</div>
+                <div className="font-semibold text-[#F5F6F8] leading-none truncate max-w-[120px]">{user.name}</div>
+                <div className="text-[10px] text-[#707783] leading-tight mt-0.5 truncate max-w-[120px]">{user.email}</div>
               </div>
             </div>
 
@@ -99,7 +112,8 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onLogout}
               title="Sign Out"
-              className="p-1.5 rounded-lg text-[#9299A5] hover:text-[#F5F6F8] hover:bg-[#15181F] border border-transparent hover:border-[#252932] transition-colors"
+              className="p-1.5 sm:p-2 rounded-xl text-[#9299A5] hover:text-[#F5F6F8] hover:bg-[#15181F] border border-transparent hover:border-[#252932] transition-colors"
+              aria-label="Sign Out"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -107,10 +121,10 @@ export const Header: React.FC<HeaderProps> = ({
         ) : (
           <button
             onClick={onSwitchToDemo}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#7657FF] hover:bg-[#896EFF] text-white font-semibold text-xs transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-[#7657FF] hover:bg-[#896EFF] text-white font-semibold text-xs transition-colors shadow-sm"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Launch Demo Mode</span>
+            <span><span className="hidden xs:inline">Launch </span>Demo Mode</span>
           </button>
         )}
       </div>

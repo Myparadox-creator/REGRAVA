@@ -74,7 +74,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   return (
-    <div className="p-8 space-y-8 max-w-5xl mx-auto text-xs text-[#D1D5DC]">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-8 max-w-5xl mx-auto text-xs text-[#D1D5DC]">
       <div>
         <h1 className="text-xl font-bold text-[#F5F6F8] tracking-tight flex items-center gap-2">
           <Settings className="w-5 h-5 text-[#896EFF]" />
@@ -85,9 +85,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* User Account & Session Card */}
-        <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-bold text-[#F5F6F8] text-sm">
               <User className="w-4 h-4 text-[#896EFF]" />
@@ -141,7 +141,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
 
         {/* GitHub App & Token Authorization Card */}
-        <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-bold text-[#F5F6F8] text-sm">
               <Github className="w-4 h-4 text-[#F5F6F8]" />
@@ -202,7 +202,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </button>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
                 onClick={async () => {
@@ -253,7 +253,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </a>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="password"
                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
@@ -298,9 +298,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       </div>
 
       {/* Engine & Security Policies */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Core Constraints */}
-        <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
           <div className="flex items-center gap-2 font-bold text-[#F5F6F8] text-sm">
             <Cpu className="w-4 h-4 text-[#896EFF]" />
             <span>Analysis Boundaries & Parsers</span>
@@ -330,7 +330,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
 
         {/* Security Safeguards & Privacy */}
-        <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
           <div className="flex items-center gap-2 font-bold text-[#F5F6F8] text-sm">
             <Lock className="w-4 h-4 text-[#10B981]" />
             <span>Zero-Retention Privacy Guarantee</span>

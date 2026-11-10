@@ -85,10 +85,10 @@ export const GitHubOAuthSetupModal: React.FC<GitHubOAuthSetupModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08090C]/85 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="bg-[#111318] border border-[#252932] rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col text-xs text-[#D1D5DC]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#08090C]/85 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="bg-[#111318] border border-[#252932] rounded-2xl max-w-lg w-full max-h-[92dvh] overflow-y-auto shadow-2xl flex flex-col text-xs text-[#D1D5DC]">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[#1C2028] sticky top-0 bg-[#111318]/95 backdrop-blur z-10">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#1C2028] sticky top-0 bg-[#111318]/95 backdrop-blur z-10">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-[#1B1F27] border border-[#252932] text-white">
               <Github className="w-4 h-4" />
@@ -116,7 +116,7 @@ export const GitHubOAuthSetupModal: React.FC<GitHubOAuthSetupModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
           {errorMsg && (
             <div className="p-3 rounded-xl bg-[#F04452]/10 border border-[#F04452]/30 text-[#F04452] flex items-center gap-2 text-xs">
               <AlertCircle className="w-4 h-4 shrink-0" />

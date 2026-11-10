@@ -4,9 +4,12 @@ Supports Google OAuth/OIDC, GitHub App & OAuth authorization, GitHub Personal Ac
 secure cookie-based session management, and zero-credential demo exploration.
 """
 
+import base64
 import hashlib
 import hmac
+import json
 import secrets
+import time
 import urllib.parse
 from typing import Dict, List, Optional, Any
 import httpx
@@ -20,8 +23,66 @@ class AuthService:
         self.secret_key = settings.SECRET_KEY.encode("utf-8")
 
     # --- Session Token Creation & Verification ---
-    def generate_session_token(self) -> str:
-        return secrets.token_urlsafe(32)
+    def generate_session_token(
+        self,
+        user: Optional[Dict[str, Any]] = None,
+        github_account: Optional[Dict[str, Any]] = None,
+        duration_seconds: int = 60 * 60 * 24 * 7,
+    ) -> str:
+        if not user:
+            return secrets.token_urlsafe(32)
+
+        user_id = str(user.get("id", ""))
+        email = str(user.get("email", ""))
+        name = str(user.get("name", ""))
+        avatar = user.get("avatar_url")
+        auth_provider = str(user.get("auth_provider", "google"))
+        is_demo = bool(user.get("is_demo", False))
+
+        gh_data = None
+        if github_account:
+            gh_data = {
+                "u": github_account.get("github_username"),
+                "tok": github_account.get("access_token"),
+                "repos": github_account.get("authorized_repos", []),
+            }
+
+        payload = {
+            "sub": user_id,
+            "email": email,
+            "name": name,
+            "avatar": avatar,
+            "provider": auth_provider,
+            "demo": is_demo,
+            "exp": int(time.time()) + duration_seconds,
+            "gh": gh_data,
+        }
+        raw_json = json.dumps(payload, separators=(',', ':'))
+        b64_payload = base64.urlsafe_b64encode(raw_json.encode('utf-8')).decode('utf-8').rstrip('=')
+        sig = hmac.new(self.secret_key, b64_payload.encode('utf-8'), hashlib.sha256).hexdigest()[:32]
+        return f"rgs_{b64_payload}.{sig}"
+
+    def verify_and_decode_session_token(self, token: str) -> Optional[Dict[str, Any]]:
+        if not token or not token.startswith("rgs_") or "." not in token:
+            return None
+        try:
+            token_body = token[4:]
+            b64_payload, sig = token_body.rsplit(".", 1)
+            expected_sig = hmac.new(self.secret_key, b64_payload.encode('utf-8'), hashlib.sha256).hexdigest()[:32]
+            if not hmac.compare_digest(sig, expected_sig):
+                return None
+
+            pad = len(b64_payload) % 4
+            if pad:
+                b64_payload += "=" * (4 - pad)
+            raw_json = base64.urlsafe_b64decode(b64_payload.encode('utf-8')).decode('utf-8')
+            payload = json.loads(raw_json)
+
+            if payload.get("exp", 0) < int(time.time()):
+                return None
+            return payload
+        except Exception:
+            return None
 
     def generate_oauth_state(self, provider: str) -> str:
         """Create a tamper-evident state parameter to prevent CSRF in OAuth flows."""
@@ -127,7 +188,8 @@ class AuthService:
                     )
                     user_id = user["id"]
 
-            session_token = self.generate_session_token()
+            gh_account = db.get_github_account(user_id) if user_id else None
+            session_token = self.generate_session_token(user=user, github_account=gh_account)
             db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
             return {"user": user, "session_token": session_token}
 
@@ -281,9 +343,6 @@ class AuthService:
                     )
                     user_id = user["id"]
 
-            session_token = self.generate_session_token()
-            db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
-
             db.save_github_account(
                 user_id=user_id,
                 github_user_id=gh_id,
@@ -292,6 +351,13 @@ class AuthService:
                 authorized_repos=authorized_repos,
                 access_token=access_token,
             )
+            gh_account = {
+                "github_username": gh_username,
+                "authorized_repos": authorized_repos,
+                "access_token": access_token,
+            }
+            session_token = self.generate_session_token(user=user, github_account=gh_account)
+            db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
 
             return {
                 "github_username": gh_username,
@@ -418,7 +484,12 @@ class AuthService:
             access_token=access_token,
         )
 
-        session_token = self.generate_session_token()
+        gh_account = {
+            "github_username": "alex-chen-demo",
+            "authorized_repos": ["demo-org/payment-service", "demo-org/user-service"],
+            "access_token": "demo-token",
+        }
+        session_token = self.generate_session_token(user=user, github_account=gh_account)
         db.create_session(user["id"], session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
         return {"user": user, "session_token": session_token}
 
@@ -437,16 +508,61 @@ def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]]:
     if not token:
         return None
 
+    if db.is_token_revoked(token):
+        return None
+
+    # 1. Check local SQLite session first
     session = db.get_session(token)
-    if not session:
-        return None
+    if session:
+        user = db.get_user_by_id(session["user_id"])
+        if user:
+            user["session_token"] = token
+            return user
 
-    user = db.get_user_by_id(session["user_id"])
-    if not user:
-        return None
+    # 2. Stateless HMAC token verification (Serverless multi-container fallback)
+    payload = auth_service.verify_and_decode_session_token(token)
+    if payload:
+        user_id = payload["sub"]
+        email = payload["email"]
+        name = payload["name"]
+        avatar = payload.get("avatar")
+        auth_provider = payload.get("provider", "google")
+        is_demo = bool(payload.get("demo", False))
 
-    user["session_token"] = token
-    return user
+        try:
+            user = db.upsert_user(
+                email=email,
+                name=name,
+                auth_provider=auth_provider,
+                avatar_url=avatar,
+                is_demo=is_demo,
+            )
+            db.create_session(user_id, token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
+
+            gh = payload.get("gh")
+            if gh and (gh.get("u") or gh.get("tok")):
+                db.save_github_account(
+                    user_id=user_id,
+                    github_user_id=None,
+                    github_username=gh.get("u"),
+                    installation_id="token-restored",
+                    authorized_repos=gh.get("repos", []),
+                    access_token=gh.get("tok"),
+                )
+        except Exception:
+            user = {
+                "id": user_id,
+                "email": email,
+                "name": name,
+                "avatar_url": avatar,
+                "auth_provider": auth_provider,
+                "is_demo": is_demo,
+            }
+
+        user["session_token"] = token
+        return user
+
+    return None
 
 
 def get_current_user(request: Request) -> Dict[str, Any]:

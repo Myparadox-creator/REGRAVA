@@ -49,7 +49,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   const samplePRNumber = 42;
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-8 max-w-7xl mx-auto">
       {/* Top Banner / Welcome */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[#1C2028]">
         <div>
@@ -61,10 +61,10 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => onNavigateToTab('security')}
-            className="px-3.5 py-2 rounded-xl bg-[#211A35] hover:bg-[#2c2247] border border-[#48366F] text-[#896EFF] text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm"
+            className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl bg-[#211A35] hover:bg-[#2c2247] border border-[#48366F] text-[#896EFF] text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-[#896EFF]" />
             <span>Security Posture</span>
@@ -74,7 +74,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             <button
               onClick={() => onScanPR(sampleRepo.owner, sampleRepo.name, samplePRNumber)}
               disabled={isLoading}
-              className="px-4 py-2 rounded-xl bg-[#7657FF] hover:bg-[#896EFF] text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
+              className="flex-1 sm:flex-initial justify-center px-4 py-2 rounded-xl bg-[#7657FF] hover:bg-[#896EFF] text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               <span>{isLoading ? 'Analyzing Diff...' : 'Run Demo Scan (PR #42)'}</span>
@@ -83,7 +83,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
 
           <button
             onClick={onConnectGitHub}
-            className="px-3.5 py-2 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center gap-2 transition-colors"
+            className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl bg-[#15181F] hover:bg-[#1B1F27] border border-[#252932] text-[#F5F6F8] text-xs font-semibold flex items-center gap-2 transition-colors"
           >
             <FolderGit2 className="w-3.5 h-3.5 text-[#9299A5]" />
             <span>Manage Repositories</span>
@@ -92,9 +92,9 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       </div>
 
       {/* The 4 Core Questions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Question 1: Which repositories are connected? */}
-        <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] hover:border-[#454B58] transition-all space-y-4">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] hover:border-[#454B58] transition-all space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#211A35] border border-[#48366F] flex items-center justify-center text-[#896EFF]">
@@ -173,7 +173,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         </div>
 
         {/* Question 2: Which pull requests need attention? */}
-        <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] hover:border-[#454B58] transition-all space-y-4">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] hover:border-[#454B58] transition-all space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#F59E0B]/10 border border-[#F59E0B]/25 flex items-center justify-center text-[#F59E0B]">
@@ -239,7 +239,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         </div>
 
         {/* Question 3: What security findings have been identified? */}
-        <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] hover:border-[#454B58] transition-all space-y-4">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] hover:border-[#454B58] transition-all space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-[#F04452]/10 border border-[#F04452]/25 flex items-center justify-center text-[#F04452]">
@@ -326,7 +326,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         </div>
 
         {/* Question 4: What should the developer do next? */}
-        <div className="p-6 rounded-2xl bg-[#111318] border border-[#252932] hover:border-[#454B58] transition-all space-y-4">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] hover:border-[#454B58] transition-all space-y-4">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[#10B981]/10 border border-[#10B981]/25 flex items-center justify-center text-[#10B981]">
               <CheckCircle2 className="w-4 h-4" />

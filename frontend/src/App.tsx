@@ -52,6 +52,7 @@ export function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // Check auth status on launch and handle GitHub / Google redirect
   useEffect(() => {
@@ -126,7 +127,11 @@ export function App() {
       setHistory(hist);
       await loadPostureData();
     } catch (err: any) {
-      setAppError(err.message || 'Failed to load initial data');
+      if (err.message && err.message.includes('Authentication required')) {
+        checkAuth();
+      } else {
+        setAppError(err.message || 'Failed to load initial data');
+      }
     }
   };
 
@@ -135,6 +140,9 @@ export function App() {
     setAppError(null);
     try {
       const res = await loginDemo();
+      if (res.token) {
+        localStorage.setItem('regrava_token', res.token);
+      }
       setUser(res.user);
       setIsAuthenticated(true);
       await checkAuth();
@@ -151,6 +159,7 @@ export function App() {
     } catch {
       // Ignore network errors on logout
     }
+    localStorage.removeItem('regrava_token');
     setIsAuthenticated(false);
     setUser(null);
     setGithubAccount(null);
@@ -163,6 +172,9 @@ export function App() {
     setAppError(null);
     try {
       const res = await connectGitHubToken(token);
+      if ((res as any).token) {
+        localStorage.setItem('regrava_token', (res as any).token);
+      }
       if (res.user) {
         setUser(res.user);
       }
@@ -311,14 +323,20 @@ export function App() {
     currentAnalysis?.findings?.filter((f) => !f.review_status || f.review_status === 'open').length || 0;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#08090C] font-sans text-[#D1D5DC]">
-      {/* Sidebar */}
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-[#08090C] font-sans text-[#D1D5DC]">
+      {/* Sidebar (Desktop permanent + Mobile slide-out drawer + Mobile bottom bar) */}
       <Sidebar
         currentTab={currentTab}
-        onTabChange={handleTabChange}
+        onTabChange={(tab) => {
+          handleTabChange(tab);
+          setIsMobileMenuOpen(false);
+        }}
         openFindingsCount={openFindingsCount}
         githubAccount={githubAccount}
         user={user}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
+        onOpenMobile={() => setIsMobileMenuOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -330,6 +348,7 @@ export function App() {
           onLogout={handleLogout}
           onOpenGitHubSetup={() => setCurrentTab('settings')}
           onSwitchToDemo={handleDemoLogin}
+          onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
 
         {/* Global Error Banner */}
@@ -346,7 +365,7 @@ export function App() {
         )}
 
         {/* Active Page View */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
           {currentTab === 'overview' && (
             <OverviewPage
               repositories={repositories}

@@ -158,10 +158,10 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#08090C]/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="bg-[#15181F] border border-[#252932] rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-[#08090C]/85 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-[#15181F] border border-[#252932] rounded-2xl max-w-3xl w-full max-h-[92dvh] overflow-y-auto shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-[#252932] sticky top-0 bg-[#15181F]/95 backdrop-blur z-10">
+        <div className="flex items-start justify-between p-4 sm:p-6 border-b border-[#252932] sticky top-0 bg-[#15181F]/95 backdrop-blur z-10">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#1B1F27] text-[#D1D5DC] border border-[#252932]">
@@ -201,7 +201,7 @@ export const FindingDetailModal: React.FC<FindingDetailModalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-6 space-y-6 text-xs text-[#D1D5DC]">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 text-xs text-[#D1D5DC]">
           {/* Plain-Language Explanation */}
           <div className="bg-[#111318] p-4 rounded-xl border border-[#252932] space-y-1.5">
             <div className="text-[10px] font-bold text-[#707783] uppercase tracking-wider">
