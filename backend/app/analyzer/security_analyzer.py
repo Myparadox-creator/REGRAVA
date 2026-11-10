@@ -80,6 +80,33 @@ class SecurityAnalyzer:
             },
         ]
 
+    @staticmethod
+    def _parse_version_tuple(ver_str: str) -> Tuple[int, ...]:
+        """Convert version string to comparable tuple of integers."""
+        try:
+            from packaging.version import parse as pkg_parse
+            v = pkg_parse(ver_str)
+            return (v.major, v.minor, v.micro)
+        except Exception:
+            parts = re.findall(r"\d+", ver_str)
+            return tuple(int(p) for p in (parts + ["0", "0", "0"])[:3])
+
+    @staticmethod
+    def _has_sql_keywords(node_expr: Any) -> bool:
+        """Check if an AST expression contains SQL command keywords."""
+        if isinstance(node_expr, ast.Constant) and isinstance(node_expr.value, str):
+            val_upper = node_expr.value.upper()
+            return any(w in val_upper for w in ["SELECT ", "UPDATE ", "DELETE ", "INSERT ", "WHERE "])
+        if isinstance(node_expr, ast.JoinedStr):
+            raw_str = "".join([part.value for part in node_expr.values if isinstance(part, ast.Constant) and isinstance(part.value, str)])
+            return any(w in raw_str.upper() for w in ["SELECT ", "UPDATE ", "DELETE ", "INSERT ", "WHERE "])
+        if isinstance(node_expr, ast.BinOp):
+            return SecurityAnalyzer._has_sql_keywords(node_expr.left) or SecurityAnalyzer._has_sql_keywords(node_expr.right)
+        if isinstance(node_expr, ast.Call) and isinstance(getattr(node_expr, "func", None), ast.Attribute):
+            if node_expr.func.attr == "format":
+                return SecurityAnalyzer._has_sql_keywords(node_expr.func.value)
+        return False
+
     def redact_secret(self, secret: str) -> str:
         """Mask detected secret for safe display in UI and logs."""
         if not secret:
@@ -178,12 +205,16 @@ class SecurityAnalyzer:
                 val = node.value
                 is_sqli = False
                 snippet = ""
-                if isinstance(val, ast.JoinedStr):
-                    raw_str = "".join([part.value for part in val.values if isinstance(part, ast.Constant)])
-                    if any(w in raw_str.upper() for w in ["SELECT ", "UPDATE ", "DELETE ", "INSERT ", "WHERE "]):
-                        is_sqli = True
-                        snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
-                elif isinstance(val, ast.BinOp) and isinstance(val.op, ast.Mod):
+                if isinstance(val, ast.JoinedStr) and self._has_sql_keywords(val):
+                    is_sqli = True
+                    snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
+                elif isinstance(val, ast.BinOp) and isinstance(val.op, ast.Mod) and self._has_sql_keywords(val.left):
+                    is_sqli = True
+                    snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
+                elif isinstance(val, ast.Call) and isinstance(getattr(val, "func", None), ast.Attribute) and val.func.attr == "format" and self._has_sql_keywords(val.func.value):
+                    is_sqli = True
+                    snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
+                elif isinstance(val, ast.BinOp) and isinstance(val.op, ast.Add) and self._has_sql_keywords(val):
                     is_sqli = True
                     snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
 
@@ -199,7 +230,7 @@ class SecurityAnalyzer:
                             changed_file=ChangedFileRef(path=file_path, line=node.lineno, symbol="query"),
                             affected_file=AffectedFileRef(path=file_path, line=node.lineno, symbol="query", context_snippet=snippet),
                             evidence=[
-                                f"SQL query constructed using dynamic interpolation at line {node.lineno}.",
+                                f"SQL query constructed using dynamic interpolation or concatenation at line {node.lineno}.",
                                 f"Code snippet: `{snippet}`",
                             ],
                             conditions=[
@@ -225,16 +256,18 @@ class SecurityAnalyzer:
                 if func_name in ["execute", "executemany", "raw"]:
                     if node.args:
                         first_arg = node.args[0]
-                        # Check f-string or % or .format()
                         is_sqli = False
                         snippet = ""
-                        if isinstance(first_arg, ast.JoinedStr):  # f"SELECT ... {var}"
-                            # Check if joined string looks like SQL query
-                            raw_str = "".join([part.value for part in first_arg.values if isinstance(part, ast.Constant)])
-                            if any(w in raw_str.upper() for w in ["SELECT ", "UPDATE ", "DELETE ", "INSERT ", "WHERE "]):
-                                is_sqli = True
-                                snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
-                        elif isinstance(first_arg, ast.BinOp) and isinstance(first_arg.op, ast.Mod):  # "SELECT ... %s" % var
+                        if isinstance(first_arg, ast.JoinedStr) and self._has_sql_keywords(first_arg):
+                            is_sqli = True
+                            snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
+                        elif isinstance(first_arg, ast.BinOp) and isinstance(first_arg.op, ast.Mod) and self._has_sql_keywords(first_arg.left):
+                            is_sqli = True
+                            snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
+                        elif isinstance(first_arg, ast.Call) and isinstance(getattr(first_arg, "func", None), ast.Attribute) and first_arg.func.attr == "format" and self._has_sql_keywords(first_arg.func.value):
+                            is_sqli = True
+                            snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
+                        elif isinstance(first_arg, ast.BinOp) and isinstance(first_arg.op, ast.Add) and self._has_sql_keywords(first_arg):
                             is_sqli = True
                             snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
 
@@ -554,17 +587,38 @@ class SecurityAnalyzer:
 
         # F1. Known Insecure Dependencies
         vulnerable_pkg_rules = [
-            ("requests<2.31.0", "requests", "2.31.0", "CVE-2023-32681 (Potential unintended leak of Proxy-Authorization header)"),
-            ("urllib3<1.26.17", "urllib3", "1.26.17", "CVE-2023-43804 (Cookie header leak on redirect)"),
-            ("cryptography<41.0.4", "cryptography", "41.0.4", "CVE-2023-38325 (Memory corruption vulnerability in OpenSSL bindings)"),
-            ("flask<2.2.5", "flask", "2.2.5", "CVE-2023-30861 (Session disclosure vulnerability)"),
-            ("axios<1.6.0", "axios", "1.6.0", "CVE-2023-45857 (Cross-Site Request Forgery via CSRF token exposure)"),
+            ("requests", "2.31.0", "CVE-2023-32681 (Potential unintended leak of Proxy-Authorization header)"),
+            ("urllib3", "1.26.17", "CVE-2023-43804 (Cookie header leak on redirect)"),
+            ("cryptography", "41.0.4", "CVE-2023-38325 (Memory corruption vulnerability in OpenSSL bindings)"),
+            ("flask", "2.2.5", "CVE-2023-30861 (Session disclosure vulnerability)"),
+            ("axios", "1.6.0", "CVE-2023-45857 (Cross-Site Request Forgery via CSRF token exposure)"),
         ]
 
-        for rule_text, pkg_name, safe_ver, advisory in vulnerable_pkg_rules:
+        for pkg_name, safe_ver, advisory in vulnerable_pkg_rules:
+            safe_tuple = self._parse_version_tuple(safe_ver)
             for idx, line in enumerate(lines, 1):
                 clean_l = line.strip().lower()
-                if clean_l.startswith(pkg_name.lower()) and any(op in clean_l for op in ["==", "<=", "<"]):
+                # Check package presence (e.g. requests==... or "axios": "...")
+                if not re.search(rf'(?:^|["\'])\s*{re.escape(pkg_name.lower())}\b', clean_l):
+                    continue
+
+                # Extract operator and version
+                match = re.search(r'(==|<=|<|>=|\^|~=|:)\s*["\']?v?([0-9]+(?:\.[0-9]+)*)', clean_l)
+                if not match:
+                    continue
+
+                op, ver_str = match.groups()
+                declared_tuple = self._parse_version_tuple(ver_str)
+
+                is_vulnerable = False
+                if op in ("==", "<=", ":", "^", "~="):
+                    if declared_tuple < safe_tuple:
+                        is_vulnerable = True
+                elif op == "<":
+                    if declared_tuple <= safe_tuple:
+                        is_vulnerable = True
+
+                if is_vulnerable:
                     findings.append(
                         Finding(
                             id=f"SEC-DEP-{len(findings) + 1:03d}",
@@ -572,7 +626,7 @@ class SecurityAnalyzer:
                             title=f"Vulnerable Dependency Version Detected: '{pkg_name}'",
                             severity=Severity.MEDIUM,
                             confidence=Confidence.HIGH,
-                            summary=f"Dependency '{pkg_name}' matches a known vulnerable version specification.",
+                            summary=f"Dependency '{pkg_name}' version {ver_str} matches known vulnerability ({advisory.split()[0]}).",
                             changed_file=ChangedFileRef(path=file_path, line=idx, symbol=pkg_name),
                             evidence=[
                                 f"Declared dependency at {file_path}:{idx}: `{line.strip()}`",
