@@ -35,6 +35,7 @@ yarn-error.log*
 
 # Vite & TS
 dist/
+!analyzer_ts/dist/
 dist-ssr/
 *.local
 
