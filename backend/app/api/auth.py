@@ -430,6 +430,7 @@ async def github_callback(
         "authorized_repos": result.get("authorized_repos", []),
         "is_live": result.get("is_live", False),
         "user": result.get("user"),
+        "token": session_token,
     }
 
 
@@ -466,6 +467,7 @@ async def connect_github_token(
         "authorized_repos": result.get("authorized_repos", []),
         "is_live": True,
         "user": result.get("user"),
+        "token": session_token,
     }
 
 
@@ -517,6 +519,16 @@ def get_me(current_user: Optional[Dict[str, Any]] = Depends(get_current_user_opt
         }
 
     gh_account = db.get_github_account(current_user["id"])
+    if not gh_account and "session_token" in current_user:
+        payload = auth_service.verify_and_decode_session_token(current_user["session_token"])
+        if payload and payload.get("gh") and payload["gh"].get("u"):
+            gh = payload["gh"]
+            gh_account = {
+                "user_id": current_user["id"],
+                "github_username": gh.get("u"),
+                "authorized_repos": gh.get("repos", []),
+                "installation_id": "token-restored",
+            }
     return {
         "authenticated": True,
         "user": {

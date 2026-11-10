@@ -441,7 +441,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[550px] bg-gradient-to-b from-[#7657FF]/20 via-[#48366F]/10 to-transparent blur-[140px] pointer-events-none z-0" />
 
         {/* Top Header */}
-        <header className="relative z-10 px-6 lg:px-12 py-4 border-b border-[#1C2028] bg-[#0B0D11]/90 backdrop-blur-xl flex items-center justify-between">
+        <header className="relative z-10 px-3 sm:px-6 lg:px-12 py-3 sm:py-4 border-b border-[#1C2028] bg-[#0B0D11]/90 backdrop-blur-xl flex items-center justify-between">
           <button
             onClick={navigateToLanding}
             className="flex items-center gap-2 text-xs font-semibold text-[#9299A5] hover:text-[#F5F6F8] px-3 py-1.5 rounded-lg hover:bg-[#15181F] border border-transparent hover:border-[#252932] transition-all"
@@ -504,7 +504,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             )}
 
             {/* Main Auth Box */}
-            <div className="p-7 rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl space-y-4 glow-purple">
+            <div className="p-4 sm:p-7 rounded-2xl bg-[#111318] border border-[#252932] shadow-2xl space-y-4 glow-purple">
               {/* Primary 1-Click Demo Sandbox */}
               <button
                 onClick={async () => {
@@ -720,7 +720,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       {/* Floating Bottom Quick-Action Pill (appears on scroll) */}
       <aside
         aria-label="Quick Actions"
-        className={`fixed bottom-6 right-6 z-40 transition-all duration-500 ease-out ${
+        className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 transition-all duration-500 ease-out ${
           showFloatingPill
             ? 'opacity-100 translate-y-0 scale-100'
             : 'opacity-0 translate-y-6 scale-95 pointer-events-none'
@@ -748,7 +748,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       {/* ========================================================================= */}
       {/* 0. PERSISTENT TELEMETRY HEADER */}
       {/* ========================================================================= */}
-      <header className="sticky top-0 z-50 backdrop-blur-2xl bg-[#0B0D11]/80 border-b border-[#1C2028] px-6 lg:px-12 py-3 transition-all">
+      <header className="sticky top-0 z-50 backdrop-blur-2xl bg-[#0B0D11]/80 border-b border-[#1C2028] px-3 sm:px-6 lg:px-12 py-3 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           {/* Logo & Brand */}
           <div
@@ -825,7 +825,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       </header>
 
       {/* Main Content Body */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12 pt-14 pb-28 space-y-36">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-8 sm:pt-14 pb-20 sm:pb-28 space-y-20 sm:space-y-36">
         {/* ========================================================================= */}
         {/* 1. HERO SECTION: CYBERNETIC COMMAND DECK */}
         {/* ========================================================================= */}
@@ -1022,7 +1022,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div className="absolute inset-0 bg-grid-pattern opacity-40 pointer-events-none" />
 
               {/* Dynamic SVG Laser Beams */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
+              <svg className="hidden md:block absolute inset-0 w-full h-full pointer-events-none z-10">
                 <path
                   d="M 230 140 C 340 140, 360 230, 480 230"
                   fill="transparent"

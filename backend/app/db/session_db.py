@@ -112,6 +112,11 @@ class DatabaseManager:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS revoked_sessions (
+                token TEXT PRIMARY KEY,
+                revoked_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
             CREATE INDEX IF NOT EXISTS idx_analyses_user ON pr_analyses(user_id);
             CREATE INDEX IF NOT EXISTS idx_analyses_repo ON pr_analyses(repo_name);
@@ -204,8 +209,19 @@ class DatabaseManager:
             return data
 
     def delete_session(self, token: str) -> None:
+        if not token:
+            return
+        now = datetime.now(timezone.utc).isoformat()
         with self._get_connection() as conn:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            conn.execute("INSERT OR REPLACE INTO revoked_sessions (token, revoked_at) VALUES (?, ?)", (token, now))
+
+    def is_token_revoked(self, token: str) -> bool:
+        if not token:
+            return True
+        with self._get_connection() as conn:
+            row = conn.execute("SELECT 1 FROM revoked_sessions WHERE token = ?", (token,)).fetchone()
+            return row is not None
 
     # --- GitHub Account & Repository Authorizations ---
     def get_github_account(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -258,8 +274,9 @@ class DatabaseManager:
                 return repo_name in ["demo-org/payment-service", "demo-org/user-service", "git_repo", "demo_project"]
             return False
 
-        # If user has a valid GitHub token connected, allow access
-        if account.get("access_token"):
+        # If user has a valid live GitHub token connected (not demo placeholder), allow access
+        tok = account.get("access_token") or ""
+        if tok and tok != "demo-token" and not tok.startswith("demo-"):
             return True
 
         repos = account.get("authorized_repos", [])

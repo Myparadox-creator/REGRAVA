@@ -60,7 +60,7 @@ export const FindingsPage: React.FC<FindingsPageProps> = ({
   }, [findings]);
 
   return (
-    <div className="p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Page Header */}
       <div className="pb-4 border-b border-[#1C2028]">
         <h1 className="text-xl font-bold text-[#F5F6F8] tracking-tight flex items-center gap-2">
@@ -73,7 +73,7 @@ export const FindingsPage: React.FC<FindingsPageProps> = ({
       </div>
 
       {/* Controls Bar */}
-      <div className="bg-[#111318] border border-[#252932] rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+      <div className="bg-[#111318] border border-[#252932] rounded-2xl p-3 sm:p-4 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 shadow-sm">
         {/* Search Input */}
         <div className="relative w-full md:w-72">
           <Search className="w-4 h-4 text-[#707783] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -87,12 +87,12 @@ export const FindingsPage: React.FC<FindingsPageProps> = ({
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {/* Status filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#15181F] border border-[#252932] rounded-xl px-3 py-2 text-xs text-[#D1D5DC] focus:outline-none focus:border-[#7657FF]"
+            className="flex-1 sm:flex-initial min-w-[130px] bg-[#15181F] border border-[#252932] rounded-xl px-3 py-2 text-xs text-[#D1D5DC] focus:outline-none focus:border-[#7657FF]"
           >
             <option value="all">All Triage States</option>
             <option value="open">Open / Unreviewed</option>
@@ -104,7 +104,7 @@ export const FindingsPage: React.FC<FindingsPageProps> = ({
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
-            className="bg-[#15181F] border border-[#252932] rounded-xl px-3 py-2 text-xs text-[#D1D5DC] focus:outline-none focus:border-[#7657FF]"
+            className="flex-1 sm:flex-initial min-w-[130px] bg-[#15181F] border border-[#252932] rounded-xl px-3 py-2 text-xs text-[#D1D5DC] focus:outline-none focus:border-[#7657FF]"
           >
             <option value="all">All Severities</option>
             <option value="high">High Severity</option>
@@ -117,7 +117,7 @@ export const FindingsPage: React.FC<FindingsPageProps> = ({
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-[#15181F] border border-[#252932] rounded-xl px-3 py-2 text-xs text-[#D1D5DC] focus:outline-none focus:border-[#7657FF]"
+            className="flex-1 sm:flex-initial min-w-[130px] bg-[#15181F] border border-[#252932] rounded-xl px-3 py-2 text-xs text-[#D1D5DC] focus:outline-none focus:border-[#7657FF]"
           >
             <option value="all">All Categories</option>
             {categories.map((c) => (
@@ -194,7 +194,7 @@ export const FindingsPage: React.FC<FindingsPageProps> = ({
                   </h3>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs text-[#9299A5]">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-[#9299A5]">
                   <span className="font-mono text-[11px] text-[#707783]">{f.confidence} confidence</span>
                   <span className="text-[#896EFF] group-hover:underline flex items-center gap-1 font-medium text-[11px]">
                     Inspect & Triage <ExternalLink className="w-3 h-3" />
