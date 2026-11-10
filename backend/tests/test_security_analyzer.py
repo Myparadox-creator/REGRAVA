@@ -141,3 +141,47 @@ app.add_middleware(
     cors = [f for f in findings if f.category == FindingCategory.CONFIGURATION and "CORS" in f.title]
     assert len(cors) == 1
     assert cors[0].severity == Severity.HIGH
+
+
+def test_sql_injection_format_and_concatenation():
+    analyzer = SecurityAnalyzer()
+    code_format = """
+def get_user_format(cursor, user_id):
+    query = "SELECT * FROM users WHERE id = '{}'".format(user_id)
+    cursor.execute(query)
+"""
+    findings_fmt = analyzer.analyze_file("backend/db_format.py", code_format)
+    sqli_fmt = [f for f in findings_fmt if f.category == FindingCategory.INJECTION and "SQL" in f.title]
+    assert len(sqli_fmt) >= 1
+
+    code_concat = """
+def get_user_concat(cursor, user_id):
+    query = "SELECT * FROM users WHERE id = '" + str(user_id) + "'"
+    cursor.execute(query)
+"""
+    findings_concat = analyzer.analyze_file("backend/db_concat.py", code_concat)
+    sqli_concat = [f for f in findings_concat if f.category == FindingCategory.INJECTION and "SQL" in f.title]
+    assert len(sqli_concat) >= 1
+
+
+def test_dependency_cve_version_parsing():
+    analyzer = SecurityAnalyzer()
+    # Safe versions - must NOT be flagged
+    safe_reqs = """
+requests==2.32.3
+cryptography==42.0.0
+flask>=3.0.0
+"""
+    findings_safe = analyzer.analyze_file("requirements.txt", safe_reqs)
+    dep_safe = [f for f in findings_safe if f.category == FindingCategory.DEPENDENCY]
+    assert len(dep_safe) == 0
+
+    # Vulnerable versions - MUST be flagged
+    vuln_reqs = """
+requests==2.30.0
+urllib3<1.26.17
+cryptography<=40.0.0
+"""
+    findings_vuln = analyzer.analyze_file("requirements.txt", vuln_reqs)
+    dep_vuln = [f for f in findings_vuln if f.category == FindingCategory.DEPENDENCY]
+    assert len(dep_vuln) == 3
