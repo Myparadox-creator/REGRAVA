@@ -35,12 +35,19 @@ import {
   triggerRepositoryAudit,
 } from './services/api';
 
+const VALID_TABS = ['overview', 'security', 'repos', 'pulls', 'findings', 'history', 'settings'];
+
+function getTabFromHash(): string {
+  const hash = window.location.hash.replace('#', '').trim().toLowerCase();
+  return VALID_TABS.includes(hash) ? hash : 'overview';
+}
+
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [githubAccount, setGithubAccount] = useState<GitHubAccount | null>(null);
-  const [currentTab, setCurrentTab] = useState<string>('overview');
+  const [currentTab, setCurrentTabState] = useState<string>(() => getTabFromHash());
   const [repositories, setRepositories] = useState<RepositoryItem[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<RepositoryItem | null>(null);
   const [pullRequests, setPullRequests] = useState<PullRequestItem[]>([]);
@@ -54,6 +61,32 @@ export function App() {
   const [appError, setAppError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
+  // Sync tab changes to URL hash and browser history
+  const setCurrentTab = (tab: string, pushHistory = true) => {
+    setCurrentTabState(tab);
+    if (pushHistory) {
+      if (window.location.hash !== `#${tab}`) {
+        window.history.pushState(null, '', `#${tab}`);
+      }
+    }
+  };
+
+  // Listen to browser Back / Forward buttons (popstate / hashchange)
+  useEffect(() => {
+    const handlePopState = () => {
+      const tab = getTabFromHash();
+      setCurrentTabState(tab);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, []);
+
   // Check auth status on launch and handle GitHub / Google redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -66,13 +99,12 @@ export function App() {
     }
 
     if (ghAuth === 'success' || googleAuth === 'success' || token) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      setCurrentTab('overview');
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
       checkAuth();
     } else if (ghAuth === 'error' || googleAuth === 'error') {
       const msg = params.get('msg') || (googleAuth === 'error' ? 'Google OAuth failed' : 'GitHub OAuth failed');
       setAppError(msg);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
       checkAuth();
     } else {
       checkAuth();
@@ -86,7 +118,6 @@ export function App() {
         setIsAuthenticated(true);
         setUser(data.user);
         setGithubAccount(data.github_account);
-        setCurrentTab('overview');
         loadInitialData();
       } else {
         setIsAuthenticated(false);
