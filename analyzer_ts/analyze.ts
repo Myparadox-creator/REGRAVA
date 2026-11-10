@@ -9,7 +9,10 @@
  */
 
 import * as ts from "typescript";
-import * as fs from "fs";
+
+declare const process: any;
+declare const require: any;
+const fs = require("fs");
 
 interface FileInput {
   path: string;
@@ -234,7 +237,7 @@ function main() {
     }
   }
 
-  let parsedInput: { files: FileInput[] };
+  let parsedInput: { files: FileInput[] } = { files: [] };
   try {
     parsedInput = JSON.parse(rawInput);
   } catch (err: any) {
