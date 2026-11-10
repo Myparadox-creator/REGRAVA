@@ -93,3 +93,9 @@ def run_demo_analysis(request: DemoAnalyzeRequest):
             status_code=500,
             detail=f"Failed to analyze demo scenario: {str(e)}",
         )
+
+
+@router.post("/analyze/{scenario_id}", response_model=AnalysisResult)
+def run_demo_analysis_by_path(scenario_id: str):
+    """Execute real static analysis by scenario path parameter."""
+    return run_demo_analysis(DemoAnalyzeRequest(scenario_id=scenario_id))

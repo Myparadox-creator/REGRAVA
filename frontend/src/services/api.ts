@@ -305,8 +305,12 @@ export async function fetchDemoScenarios(): Promise<DemoScenario[]> {
 
 export async function runDemoAnalysis(scenarioId: string): Promise<AnalysisResult> {
   return fetchJson<AnalysisResult>(
-    `${API_BASE}/demo/analyze/${scenarioId}`,
-    { method: 'POST' },
+    `${API_BASE}/demo/analyze`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario_id: scenarioId }),
+    },
     'Demo analysis failed'
   );
 }

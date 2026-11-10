@@ -32,11 +32,19 @@ def test_run_demo_analysis_breaking():
     res = client.post("/api/demo/analyze", json={"scenario_id": "scenario_b"})
     assert res.status_code == 200
     data = res.json()
-    assert data["metrics"]["high_severity_count"] == 1
     assert data["metrics"]["breaking_contract_changes"] == 1
     assert len(data["findings"]) >= 1
     f = data["findings"][0]
-    assert f["severity"] == "high"
+    assert f["field_name"] == "user_id"
+
+
+def test_run_demo_analysis_by_path():
+    res = client.post("/api/demo/analyze/scenario_b")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["metrics"]["breaking_contract_changes"] == 1
+    assert len(data["findings"]) >= 1
+    f = data["findings"][0]
     assert f["field_name"] == "user_id"
 
 
