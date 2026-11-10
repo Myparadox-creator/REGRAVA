@@ -72,6 +72,16 @@ class PRAnalysisService:
                 if head_c:
                     head_ts_files[fname] = head_c
 
+        # If no frontend files were directly modified in this PR, fetch existing repository frontend consumers
+        # to ensure breaking backend changes are verified against real consumers
+        if not head_ts_files and base_py_files and head_py_files:
+            extra_ts_files = await github_service.get_repository_frontend_files(
+                user_id=user_id,
+                repo_full_name=repo_name,
+                head_sha=pr_data.get("head_ref"),
+            )
+            head_ts_files.update(extra_ts_files)
+
         contract_diff_summary = {
             "fields_removed": [],
             "fields_added": [],
