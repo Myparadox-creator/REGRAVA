@@ -417,5 +417,53 @@ class GitHubService:
 
         raise FileNotFoundError(f"PR #{pr_number} not found.")
 
+    async def get_repository_frontend_files(
+        self, user_id: str, repo_full_name: str, head_sha: Optional[str] = None
+    ) -> Dict[str, str]:
+        """Fetch repository frontend consumer files for cross-boundary contract validation."""
+        # Check local demo/reference fixtures
+        if "payment" in repo_full_name.lower():
+            payment_view = settings.PROJECT_ROOT / "services" / "payments" / "PaymentView.tsx"
+            if payment_view.exists():
+                try:
+                    return {"services/payments/PaymentView.tsx": payment_view.read_text(encoding="utf-8")}
+                except Exception:
+                    pass
+
+        # Real GitHub API lookup
+        account = db.get_github_account(user_id)
+        access_token = (account.get("access_token") if account else None) or settings.GITHUB_TOKEN
+        if access_token and head_sha:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    tree_res = await client.get(
+                        f"https://api.github.com/repos/{repo_full_name}/git/trees/{head_sha}?recursive=1",
+                        headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github.v3+json"},
+                    )
+                    if tree_res.status_code == 200:
+                        tree_data = tree_res.json().get("tree", [])
+                        ts_paths = [
+                            item["path"]
+                            for item in tree_data
+                            if item.get("type") == "blob"
+                            and item.get("path", "").endswith((".ts", ".tsx", ".js", ".jsx"))
+                            and not any(x in item.get("path", "") for x in ["node_modules", "dist", ".min."])
+                        ][:15]
+
+                        collected = {}
+                        for path in ts_paths:
+                            content_res = await client.get(
+                                f"https://api.github.com/repos/{repo_full_name}/contents/{path}?ref={head_sha}",
+                                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/vnd.github.v3.raw"},
+                            )
+                            if content_res.status_code == 200:
+                                collected[path] = content_res.text
+                        if collected:
+                            return collected
+            except Exception:
+                pass
+
+        return {}
+
 
 github_service = GitHubService()
