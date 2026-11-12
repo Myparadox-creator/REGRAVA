@@ -283,7 +283,7 @@ class DatabaseManager:
         expires_at = (now + timedelta(seconds=duration_seconds)).isoformat()
         with self._get_connection() as conn:
             conn.execute(
-                "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
                 (token, user_id, now.isoformat(), expires_at),
             )
         return token

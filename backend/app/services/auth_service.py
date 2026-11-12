@@ -48,6 +48,7 @@ class AuthService:
             }
 
         payload = {
+            "jti": secrets.token_hex(8),
             "sub": user_id,
             "email": email,
             "name": name,
