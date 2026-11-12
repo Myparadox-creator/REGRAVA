@@ -12,6 +12,13 @@ import {
   TargetAITool,
   SteeredPromptResponse,
   AIAuditReport,
+  GitHubAppStatus,
+  ReviewJobRecord,
+  PRReviewsBundle,
+  GitHubReviewRecord,
+  RepoReviewSettings,
+  FindingLifecycleRecord,
+  LifecycleStatus,
 } from '../types';
 
 const API_BASE = '/api';
@@ -404,5 +411,124 @@ export async function auditAIReviews(payload: {
       body: JSON.stringify(payload),
     },
     'Failed to audit AI bot reviews'
+  );
+}
+
+// =============================================================================
+// NATIVE GITHUB PR REVIEWER API
+// =============================================================================
+
+export async function fetchGitHubAppStatus(): Promise<GitHubAppStatus> {
+  return fetchJson<GitHubAppStatus>(
+    `${API_BASE}/github/app/status`,
+    undefined,
+    'Failed to fetch GitHub App status'
+  );
+}
+
+export async function startPullRequestReview(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  options?: { force_re_review?: boolean; dry_run?: boolean; wait_for_completion?: boolean }
+): Promise<ReviewJobRecord> {
+  return fetchJson<ReviewJobRecord>(
+    `${API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}/review`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        force_re_review: options?.force_re_review ?? false,
+        dry_run: options?.dry_run ?? false,
+        wait_for_completion: options?.wait_for_completion ?? false,
+      }),
+    },
+    `Failed to start REGRAVA review for ${owner}/${repo}#${prNumber}`
+  );
+}
+
+export async function fetchReviewJobProgress(jobId: string): Promise<ReviewJobRecord> {
+  return fetchJson<ReviewJobRecord>(
+    `${API_BASE}/reviews/jobs/${encodeURIComponent(jobId)}`,
+    undefined,
+    'Failed to poll review job status'
+  );
+}
+
+export async function fetchPRReviews(
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<PRReviewsBundle> {
+  return fetchJson<PRReviewsBundle>(
+    `${API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}/reviews`,
+    undefined,
+    `Failed to load PR review history for #${prNumber}`
+  );
+}
+
+export async function fetchUserReviews(repoFullName?: string): Promise<GitHubReviewRecord[]> {
+  const query = repoFullName ? `?repo=${encodeURIComponent(repoFullName)}` : '';
+  return fetchJson<GitHubReviewRecord[]>(
+    `${API_BASE}/reviews${query}`,
+    undefined,
+    'Failed to load GitHub reviews'
+  );
+}
+
+export async function retryReviewPublication(reviewRecordId: string): Promise<GitHubReviewRecord> {
+  return fetchJson<GitHubReviewRecord>(
+    `${API_BASE}/reviews/${encodeURIComponent(reviewRecordId)}/retry`,
+    { method: 'POST' },
+    'Failed to retry GitHub review publication'
+  );
+}
+
+export async function fetchRepoReviewSettings(owner: string, repo: string): Promise<RepoReviewSettings> {
+  return fetchJson<RepoReviewSettings>(
+    `${API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/review-settings`,
+    undefined,
+    'Failed to fetch repository review settings'
+  );
+}
+
+export async function updateRepoReviewSettings(
+  owner: string,
+  repo: string,
+  autoReviewEnabled: boolean,
+  confidenceThreshold = 'medium'
+): Promise<RepoReviewSettings> {
+  return fetchJson<RepoReviewSettings>(
+    `${API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/review-settings`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auto_review_enabled: autoReviewEnabled,
+        confidence_threshold: confidenceThreshold,
+      }),
+    },
+    'Failed to update automatic PR review settings'
+  );
+}
+
+export async function updateFindingLifecycleStatus(
+  recordId: string,
+  status: LifecycleStatus,
+  notes?: string,
+  verificationEvidence?: string
+): Promise<FindingLifecycleRecord> {
+  return fetchJson<FindingLifecycleRecord>(
+    `${API_BASE}/findings/lifecycle/${encodeURIComponent(recordId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status,
+        notes,
+        verification_evidence: verificationEvidence,
+      }),
+    },
+    'Failed to update finding lifecycle status'
   );
 }

@@ -14,7 +14,7 @@ import {
   RefreshCw,
   LogOut,
 } from 'lucide-react';
-import { UserProfile, GitHubAccount } from '../types';
+import { UserProfile, GitHubAccount, GitHubAppStatus } from '../types';
 import { getGitHubAuthUrl } from '../services/api';
 import { GitHubOAuthSetupModal } from '../components/GitHubOAuthSetupModal';
 import { GoogleOAuthSetupModal } from '../components/GoogleOAuthSetupModal';
@@ -22,6 +22,7 @@ import { GoogleOAuthSetupModal } from '../components/GoogleOAuthSetupModal';
 interface SettingsPageProps {
   user: UserProfile | null;
   githubAccount: GitHubAccount | null;
+  githubAppStatus?: GitHubAppStatus | null;
   onLogout: () => void;
   onConnectGitHub: () => void;
   onConnectToken?: (token: string) => Promise<void>;
@@ -31,6 +32,7 @@ interface SettingsPageProps {
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   user,
   githubAccount,
+  githubAppStatus,
   onLogout,
   onConnectGitHub,
   onConnectToken,
@@ -295,6 +297,57 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Native GitHub App Reviewer Status */}
+      <div className="p-4 sm:p-6 rounded-2xl bg-[#111318] border border-[#252932] space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2 font-bold text-[#F5F6F8] text-sm">
+            <Github className="w-4 h-4 text-[#896EFF]" />
+            <span>REGRAVA GitHub App Reviewer Identity</span>
+          </div>
+          <span
+            className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded w-fit ${
+              githubAppStatus?.is_app_configured
+                ? 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30'
+                : 'bg-[#211A35] text-[#896EFF] border border-[#48366F]'
+            }`}
+          >
+            {githubAppStatus?.is_app_configured ? 'App Credentials Active' : 'Dry-Run Mode Ready'}
+          </span>
+        </div>
+
+        <p className="text-xs text-[#9299A5] leading-relaxed">
+          Reviews published to GitHub appear under the dedicated <strong className="text-[#F5F6F8]">{githubAppStatus?.app_name || 'REGRAVA'}</strong> GitHub App identity using short-lived installation access tokens. Private keys and webhook secrets remain strictly backend-only.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-[11px]">
+          <div className="p-3 rounded-xl bg-[#0B0D11] border border-[#1C2028] space-y-1">
+            <div className="text-[#707783] text-[10px] uppercase font-sans">App Signing</div>
+            <div className={githubAppStatus?.is_app_configured ? 'text-[#10B981] font-bold' : 'text-[#F59E0B] font-bold'}>
+              {githubAppStatus?.is_app_configured ? 'Configured (RS256 JWT)' : 'Unconfigured (Dry-Run)'}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#0B0D11] border border-[#1C2028] space-y-1">
+            <div className="text-[#707783] text-[10px] uppercase font-sans">Webhook Verification</div>
+            <div className={githubAppStatus?.webhook_configured ? 'text-[#10B981] font-bold' : 'text-[#9299A5] font-bold'}>
+              {githubAppStatus?.webhook_configured ? 'HMAC-SHA256 Active' : 'Secret Not Set'}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#0B0D11] border border-[#1C2028] space-y-1">
+            <div className="text-[#707783] text-[10px] uppercase font-sans">Minimum Permissions</div>
+            <div className="text-[#D1D5DC]">Metadata: R • Contents: R • PRs: R/W</div>
+          </div>
+        </div>
+
+        {!githubAppStatus?.is_app_configured && (
+          <div className="p-3 rounded-xl bg-[#0B0D11] border border-[#252932] text-[11px] text-[#9299A5] space-y-1">
+            <div className="font-semibold text-[#F5F6F8]">Backend Environment Setup for Live Publishing:</div>
+            <p className="font-mono text-[10px] text-[#896EFF]">
+              GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY (or GITHUB_PRIVATE_KEY_PATH), GITHUB_WEBHOOK_SECRET
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Engine & Security Policies */}

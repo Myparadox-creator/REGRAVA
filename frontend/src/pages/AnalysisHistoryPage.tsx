@@ -5,6 +5,8 @@ import {
   ArrowRight,
   GitBranch,
   RefreshCw,
+  GitCommit,
+  ExternalLink,
 } from 'lucide-react';
 import { AnalysisHistoryItem } from '../types';
 
@@ -81,15 +83,54 @@ export const AnalysisHistoryPage: React.FC<AnalysisHistoryPageProps> = ({
                     <span className="text-[#454B58]">&rarr;</span>
                     <span>{item.base_ref}</span>
                   </div>
+                  {item.head_sha && (
+                    <>
+                      <span>&bull;</span>
+                      <span className="flex items-center gap-1 text-[11px] font-mono text-[#D1D5DC]">
+                        <GitCommit className="w-3 h-3 text-[#707783]" />
+                        {item.head_sha.slice(0, 7)}
+                      </span>
+                    </>
+                  )}
                   <span>&bull;</span>
                   <span className="flex items-center gap-1 text-[11px] font-mono">
                     <Clock className="w-3 h-3 text-[#707783]" />
-                    {item.execution_time_ms}ms
+                    {item.execution_time_ms.toFixed(1)}ms
                   </span>
                   <span>&bull;</span>
                   <span className="text-[11px] text-[#707783]">
                     {new Date(item.created_at).toLocaleString()}
                   </span>
+                  {item.publication_status && (
+                    <>
+                      <span>&bull;</span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase border ${
+                          item.publication_status === 'published'
+                            ? 'bg-[#10B981]/15 text-[#10B981] border-[#10B981]/30'
+                            : item.publication_status === 'dry_run'
+                            ? 'bg-[#211A35] text-[#896EFF] border-[#48366F]'
+                            : item.publication_status === 'failed'
+                            ? 'bg-[#F04452]/15 text-[#F04452] border-[#F04452]/30'
+                            : 'bg-[#15181F] text-[#9299A5] border-[#252932]'
+                        }`}
+                      >
+                        {item.publication_status}
+                      </span>
+                    </>
+                  )}
+                  {item.github_review_url && (
+                    <a
+                      href={item.github_review_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[11px] text-[#896EFF] hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <span>GitHub Review</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
               </div>
 

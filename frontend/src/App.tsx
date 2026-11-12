@@ -19,6 +19,11 @@ import {
   Finding,
   AnalysisHistoryItem,
   FleetSecurityPosture,
+  GitHubAppStatus,
+  PRReviewsBundle,
+  ReviewJobRecord,
+  RepoReviewSettings,
+  LifecycleStatus,
 } from './types';
 import {
   fetchAuthStatus,
@@ -27,12 +32,20 @@ import {
   fetchAuthorizedRepositories,
   fetchRepoPullRequests,
   runPullRequestAnalysis,
+  fetchPRAnalysis,
   fetchAnalysisHistory,
   updateFindingReview,
   connectGitHubToken,
   disconnectGitHub,
   fetchSecurityPosture,
   triggerRepositoryAudit,
+  fetchGitHubAppStatus,
+  startPullRequestReview,
+  fetchReviewJobProgress,
+  fetchPRReviews,
+  retryReviewPublication,
+  updateRepoReviewSettings,
+  updateFindingLifecycleStatus,
 } from './services/api';
 
 const VALID_TABS = ['overview', 'security', 'repos', 'pulls', 'findings', 'history', 'settings'];
@@ -60,6 +73,10 @@ export function App() {
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [appError, setAppError] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [githubAppStatus, setGithubAppStatus] = useState<GitHubAppStatus | null>(null);
+  const [prReviewsBundle, setPrReviewsBundle] = useState<PRReviewsBundle | null>(null);
+  const [activeReviewJob, setActiveReviewJob] = useState<ReviewJobRecord | null>(null);
+  const [repoSettings, setRepoSettings] = useState<RepoReviewSettings | null>(null);
 
   // Sync tab changes to URL hash and browser history
   const setCurrentTab = (tab: string, pushHistory = true) => {
@@ -141,6 +158,7 @@ export function App() {
 
   const loadInitialData = async () => {
     try {
+      fetchGitHubAppStatus().then(setGithubAppStatus).catch(() => {});
       const repos = await fetchAuthorizedRepositories();
       setRepositories(repos);
       if (repos.length > 0) {
@@ -163,6 +181,111 @@ export function App() {
       } else {
         setAppError(err.message || 'Failed to load initial data');
       }
+    }
+  };
+
+  const loadPRReviewsFor = async (owner: string, repo: string, prNumber: number) => {
+    try {
+      const bundle = await fetchPRReviews(owner, repo, prNumber);
+      setPrReviewsBundle(bundle);
+      setRepoSettings(bundle.settings);
+      if (bundle.latest_job) {
+        setActiveReviewJob(bundle.latest_job);
+      }
+    } catch {
+      // Ignore background fetch errors
+    }
+  };
+
+  const handleReviewWithRegrava = async (
+    owner: string,
+    repo: string,
+    prNumber: number,
+    options?: { force_re_review?: boolean; dry_run?: boolean }
+  ) => {
+    setAppError(null);
+    try {
+      let job = await startPullRequestReview(owner, repo, prNumber, options);
+      setActiveReviewJob(job);
+
+      const terminalStates = new Set(['published', 'dry_run', 'failed', 'already_reviewed']);
+      let attempts = 0;
+      while (!terminalStates.has(job.state) && attempts < 45) {
+        await new Promise((resolve) => setTimeout(resolve, 900));
+        job = await fetchReviewJobProgress(job.job_id);
+        setActiveReviewJob(job);
+        attempts += 1;
+      }
+
+      if (job.analysis_id) {
+        try {
+          const syncedAnalysis = await fetchPRAnalysis(job.analysis_id);
+          setCurrentAnalysis(syncedAnalysis);
+        } catch {
+          // Ignore if analysis was skipped before completion
+        }
+      }
+
+      await loadPRReviewsFor(owner, repo, prNumber);
+      const updatedHist = await fetchAnalysisHistory();
+      setHistory(updatedHist);
+      loadPostureData();
+
+      if (job.state === 'failed' && job.error_message) {
+        setAppError(job.error_message);
+      }
+    } catch (err: any) {
+      setAppError(err.message || 'Failed to run REGRAVA PR review');
+    }
+  };
+
+  const handleRetryPublish = async (reviewRecordId: string) => {
+    setAppError(null);
+    try {
+      await retryReviewPublication(reviewRecordId);
+      if (selectedRepo && (currentAnalysis?.pr_number || pullRequests[0]?.number)) {
+        await loadPRReviewsFor(
+          selectedRepo.owner,
+          selectedRepo.name,
+          currentAnalysis?.pr_number || pullRequests[0].number
+        );
+      }
+      const updatedHist = await fetchAnalysisHistory();
+      setHistory(updatedHist);
+    } catch (err: any) {
+      setAppError(err.message || 'Retry publication failed');
+    }
+  };
+
+  const handleToggleAutoReview = async (owner: string, repo: string, enabled: boolean) => {
+    setAppError(null);
+    try {
+      const updated = await updateRepoReviewSettings(owner, repo, enabled);
+      setRepoSettings(updated);
+      setPrReviewsBundle((prev) => (prev ? { ...prev, settings: updated } : prev));
+    } catch (err: any) {
+      setAppError(err.message || 'Failed to update automatic PR review setting');
+    }
+  };
+
+  const handleUpdateLifecycleStatus = async (
+    recordId: string,
+    status: LifecycleStatus,
+    notes?: string,
+    verificationEvidence?: string
+  ) => {
+    setAppError(null);
+    try {
+      await updateFindingLifecycleStatus(recordId, status, notes, verificationEvidence);
+      if (selectedRepo && (currentAnalysis?.pr_number || pullRequests[0]?.number)) {
+        await loadPRReviewsFor(
+          selectedRepo.owner,
+          selectedRepo.name,
+          currentAnalysis?.pr_number || pullRequests[0].number
+        );
+      }
+    } catch (err: any) {
+      setAppError(err.message || 'Failed to update finding lifecycle status');
     }
   };
 
@@ -445,6 +568,15 @@ export function App() {
               isLoading={isLoading}
               onAnalyzePR={runScan}
               onSelectFinding={setSelectedFinding}
+              prReviewsBundle={prReviewsBundle}
+              activeReviewJob={activeReviewJob}
+              repoSettings={repoSettings}
+              githubAppConfigured={Boolean(githubAppStatus?.is_app_configured)}
+              onReviewWithRegrava={handleReviewWithRegrava}
+              onRetryPublish={handleRetryPublish}
+              onToggleAutoReview={handleToggleAutoReview}
+              onLoadPRReviews={loadPRReviewsFor}
+              onUpdateLifecycleStatus={handleUpdateLifecycleStatus}
             />
           )}
 
@@ -452,6 +584,9 @@ export function App() {
             <FindingsPage
               findings={currentAnalysis?.findings || []}
               onSelectFinding={setSelectedFinding}
+              prNumber={currentAnalysis?.pr_number}
+              lifecycleRecords={prReviewsBundle?.finding_lifecycle || []}
+              latestReviewUrl={prReviewsBundle?.reviews?.[0]?.github_review_url}
             />
           )}
 
@@ -463,7 +598,20 @@ export function App() {
                 const hist = await fetchAnalysisHistory();
                 setHistory(hist);
               }}
-              onSelectHistoryItem={(_item) => {
+              onSelectHistoryItem={async (item) => {
+                try {
+                  const full = await fetchPRAnalysis(item.id);
+                  setCurrentAnalysis(full);
+                  const matchedRepo = repositories.find(
+                    (r) => r.full_name.toLowerCase() === item.repo_name.toLowerCase()
+                  );
+                  if (matchedRepo) {
+                    setSelectedRepo(matchedRepo);
+                    await loadPRReviewsFor(matchedRepo.owner, matchedRepo.name, item.pr_number);
+                  }
+                } catch {
+                  // Fallback to tab navigation
+                }
                 setCurrentTab('pulls');
               }}
             />
@@ -473,6 +621,7 @@ export function App() {
             <SettingsPage
               user={user}
               githubAccount={githubAccount}
+              githubAppStatus={githubAppStatus}
               onLogout={handleLogout}
               onConnectGitHub={() => setCurrentTab('settings')}
               onConnectToken={handleConnectGitHubToken}

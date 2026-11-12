@@ -115,7 +115,9 @@ class SecurityAnalyzer:
             return secret[:2] + "****"
         return secret[:4] + "*" * (len(secret) - 8) + secret[-4:]
 
-    def analyze_file(self, file_path: str, content: str) -> List[Finding]:
+    def analyze_file(
+        self, file_path: str, content: str, context_files: Optional[Dict[str, str]] = None
+    ) -> List[Finding]:
         findings: List[Finding] = []
         norm_path = file_path.replace("\\", "/")
 
@@ -124,7 +126,7 @@ class SecurityAnalyzer:
 
         # 2. Python-specific Security AST & Source Scan
         if norm_path.endswith(".py"):
-            findings.extend(self._scan_python_security(norm_path, content))
+            findings.extend(self._scan_python_security(norm_path, content, context_files=context_files))
 
         # 3. TypeScript / JavaScript / TSX Security Scan
         if norm_path.endswith((".ts", ".tsx", ".js", ".jsx")):
@@ -190,7 +192,32 @@ class SecurityAnalyzer:
         return findings
 
     # --- Category B, C, D: Python Security AST Analysis ---
-    def _scan_python_security(self, file_path: str, content: str) -> List[Finding]:
+    def _has_router_or_middleware_auth_guard(
+        self, content: str, context_files: Optional[Dict[str, str]]
+    ) -> bool:
+        """Inspect module and surrounding context files for explicit authorization dependencies or middleware."""
+        guard_terms = (
+            "verify_ownership",
+            "require_ownership",
+            "check_ownership",
+            "require_admin",
+            "authorize_user",
+            "PermissionChecker",
+            "OwnershipChecker",
+        )
+        if "APIRouter" in content and "dependencies=" in content and any(t in content for t in guard_terms):
+            return True
+        if context_files:
+            for path, src in context_files.items():
+                if not path.endswith(".py"):
+                    continue
+                if any(t in src for t in guard_terms) and ("middleware" in src.lower() or "APIRouter" in src):
+                    return True
+        return False
+
+    def _scan_python_security(
+        self, file_path: str, content: str, context_files: Optional[Dict[str, str]] = None
+    ) -> List[Finding]:
         findings: List[Finding] = []
         try:
             tree = ast.parse(content, filename=file_path)
@@ -198,6 +225,7 @@ class SecurityAnalyzer:
             return findings
 
         lines = content.splitlines()
+        module_has_auth_guard = self._has_router_or_middleware_auth_guard(content, context_files)
 
         for node in ast.walk(tree):
             # B1-a. SQL Injection: Raw SQL string formatting in assignments (e.g. query = f"SELECT ... {id}")
@@ -417,12 +445,22 @@ class SecurityAnalyzer:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 # Check if decorated as FastAPI route
                 is_route = False
+                has_decorator_guard = False
                 for dec in node.decorator_list:
+                    dec_src = ast.get_source_segment(content, dec) or ""
+                    if any(g in dec_src.lower() for g in ["require_auth", "require_admin", "require_ownership", "authorize", "verify_ownership", "permission"]):
+                        has_decorator_guard = True
                     if isinstance(dec, ast.Call) and isinstance(getattr(dec, "func", None), (ast.Attribute, ast.Name)):
                         attr = getattr(dec.func, "attr", getattr(dec.func, "id", ""))
                         if attr.lower() in ["get", "post", "put", "delete", "patch"]:
                             is_route = True
-                            break
+                            # Check route-level dependencies=[Depends(...)]
+                            for kw in getattr(dec, "keywords", []):
+                                if kw.arg == "dependencies" and any(
+                                    g in (ast.get_source_segment(content, kw.value) or "").lower()
+                                    for g in ["auth", "ownership", "permission", "admin", "access"]
+                                ):
+                                    has_decorator_guard = True
 
                 if is_route:
                     # Check parameters for ID parameters e.g. user_id, account_id, org_id
@@ -431,11 +469,30 @@ class SecurityAnalyzer:
                         if arg.arg in ["user_id", "account_id", "customer_id", "profile_id"]
                     ]
 
-                    # Check function body for ownership verification
+                    # Check function signature & body for ownership verification or explicit authz Depends(...)
                     func_body_text = ast.get_source_segment(content, node) or ""
-                    has_auth_check = any(
-                        term in func_body_text
-                        for term in ["current_user.id ==", "user.id ==", "check_ownership", "verify_ownership", "permission"]
+                    lower_body = func_body_text.lower()
+                    has_auth_check = (
+                        has_decorator_guard
+                        or module_has_auth_guard
+                        or any(
+                            term in lower_body
+                            for term in [
+                                "current_user.id ==",
+                                "current_user.id !=",
+                                'current_user["id"] ==',
+                                'current_user["id"] !=',
+                                "user.id ==",
+                                "user.id !=",
+                                "check_ownership",
+                                "verify_ownership",
+                                "verify_access",
+                                "require_ownership",
+                                "require_admin",
+                                "permission",
+                                "authorize",
+                            ]
+                        )
                     )
 
                     if id_params and not has_auth_check:

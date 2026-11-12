@@ -13,6 +13,7 @@ from app.api.auth import router as auth_router
 from app.api.demo import router as demo_router
 from app.api.health import router as health_router
 from app.api.pull_requests import router as pr_router
+from app.api.github_reviews import router as github_reviews_router
 from app.api.security import router as security_router
 from app.api.ai_steering import router as ai_steering_router
 from app.config import settings
@@ -50,6 +51,7 @@ routers = [
     health_router,
     auth_router,
     pr_router,
+    github_reviews_router,
     security_router,
     demo_router,
     analysis_router,

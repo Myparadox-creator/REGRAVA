@@ -9,16 +9,22 @@ import {
   CheckCircle2,
   EyeOff,
 } from 'lucide-react';
-import { Finding, Severity } from '../types';
+import { Finding, Severity, FindingLifecycleRecord } from '../types';
 
 interface FindingsPageProps {
   findings: Finding[];
   onSelectFinding: (finding: Finding) => void;
+  prNumber?: number;
+  lifecycleRecords?: FindingLifecycleRecord[];
+  latestReviewUrl?: string;
 }
 
 export const FindingsPage: React.FC<FindingsPageProps> = ({
   findings,
   onSelectFinding,
+  prNumber,
+  lifecycleRecords = [],
+  latestReviewUrl,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
@@ -224,17 +230,63 @@ export const FindingsPage: React.FC<FindingsPageProps> = ({
                     </span>
                   </div>
                 )}
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#15181F] text-[#D1D5DC] border border-[#1C2028] text-[11px]">
-                  <span className="text-[#707783]">Tests:</span>
-                  <span
-                    className={
-                      f.test_evidence === 'found' ? 'text-[#10B981] font-semibold' : 'text-[#F59E0B]'
-                    }
-                  >
-                    {f.test_evidence}
-                  </span>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#15181F] text-[#D1D5DC] border border-[#1C2028] text-[11px]">
+                    <span className="text-[#707783]">Tests:</span>
+                    <span
+                      className={
+                        f.test_evidence === 'found' ? 'text-[#10B981] font-semibold' : 'text-[#F59E0B]'
+                      }
+                    >
+                      {f.test_evidence}
+                    </span>
+                  </div>
+                  {(() => {
+                    const lf = lifecycleRecords.find(
+                      (r) =>
+                        r.finding_id === f.id ||
+                        (r.file_path && f.changed_file?.path && r.file_path === f.changed_file.path && r.title === f.title)
+                    );
+                    if (!lf && !prNumber) return null;
+                    return (
+                      <>
+                        {(lf?.pr_number || prNumber) && (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#15181F] border border-[#1C2028] font-mono text-[11px] text-[#896EFF]">
+                            PR #{lf?.pr_number || prNumber}
+                          </div>
+                        )}
+                        {lf && (
+                          <div
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${
+                              lf.current_status === 'Verified Fixed'
+                                ? 'bg-[#10B981]/15 border-[#10B981]/30 text-[#10B981]'
+                                : lf.current_status === 'Still Present' || lf.current_status === 'Open'
+                                ? 'bg-[#F04452]/10 border-[#F04452]/30 text-[#F04452]'
+                                : 'bg-[#F59E0B]/10 border-[#F59E0B]/30 text-[#F59E0B]'
+                            }`}
+                          >
+                            Status: {lf.current_status}
+                          </div>
+                        )}
+                        {lf?.published_to_github && (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#211A35] border border-[#48366F] text-[#896EFF] text-[11px] font-semibold">
+                            <span>Published to GitHub</span>
+                            {latestReviewUrl && (
+                              <a
+                                href={latestReviewUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="underline ml-1"
+                              >
+                                View
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
-              </div>
             </div>
           ))
         )}

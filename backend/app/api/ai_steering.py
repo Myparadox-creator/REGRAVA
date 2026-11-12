@@ -5,6 +5,7 @@ Copilot, and Windsurf directly from AST findings, as well as audit AI bot PR com
 """
 
 from typing import Optional
+# pyrefly: ignore[missing-import]
 from fastapi import APIRouter, HTTPException, Query
 from app.analyzer.ai_auditor import AIAuditor
 from app.analyzer.prompt_generator import PromptGenerator

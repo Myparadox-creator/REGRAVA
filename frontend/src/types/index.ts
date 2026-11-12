@@ -144,6 +144,10 @@ export interface AnalysisHistoryItem {
   pr_title: string;
   base_ref: string;
   head_ref: string;
+  head_sha?: string;
+  publication_status?: string;
+  github_review_url?: string;
+  github_review_id?: string;
   status: string;
   metrics: AnalysisMetrics;
   execution_time_ms: number;
@@ -276,4 +280,140 @@ export interface AIAuditReport {
   security_risk_count: number;
   noise_count: number;
   items: AIAuditItem[];
+}
+
+export type ReviewJobState =
+  | 'ready'
+  | 'in_progress'
+  | 'collecting_pr_changes'
+  | 'running_security_checks'
+  | 'generating_review'
+  | 'publishing_review'
+  | 'published'
+  | 'dry_run'
+  | 'failed'
+  | 'already_reviewed';
+
+export interface ReviewStepItem {
+  label: string;
+  status: 'done' | 'error' | 'running';
+  timestamp: string;
+}
+
+export interface GitHubReviewInlineComment {
+  path: string;
+  line: number;
+  side: 'RIGHT' | 'LEFT';
+  body: string;
+  finding_id?: string;
+  fingerprint?: string;
+  github_comment_id?: string;
+  html_url?: string;
+}
+
+export interface GitHubReviewRecord {
+  id: string;
+  repo_full_name: string;
+  repo_id?: string;
+  pr_number: number;
+  head_sha: string;
+  analyzer_version: string;
+  analysis_id?: string;
+  github_review_id?: string;
+  github_review_url?: string;
+  summary_body: string;
+  inline_comments: GitHubReviewInlineComment[];
+  published_fingerprints: string[];
+  publication_status: 'published' | 'dry_run' | 'failed' | 'stale_discarded' | 'already_reviewed';
+  error_detail?: string;
+  mode: 'manual' | 'automatic';
+  triggered_by?: string;
+  created_at: string;
+  updated_at: string;
+  dry_run_payload?: {
+    endpoint: string;
+    commit_id: string;
+    event: string;
+    body: string;
+    comments: Array<{ path: string; line: number; side: string; body: string }>;
+  };
+}
+
+export interface ReviewJobRecord {
+  job_id: string;
+  user_id: string;
+  repo_full_name: string;
+  pr_number: number;
+  head_sha?: string;
+  state: ReviewJobState;
+  steps: ReviewStepItem[];
+  analysis_id?: string;
+  review_record_id?: string;
+  error_message?: string;
+  dry_run: boolean;
+  created_at: string;
+  updated_at: string;
+  review?: GitHubReviewRecord;
+}
+
+export type LifecycleStatus =
+  | 'Open'
+  | 'Fix Attempted'
+  | 'Verified Fixed'
+  | 'Still Present'
+  | 'Dismissed with Reason'
+  | 'Accepted with Reason'
+  | 'Verification Inconclusive';
+
+export interface FindingLifecycleRecord {
+  id: string;
+  finding_id: string;
+  fingerprint: string;
+  repo_full_name: string;
+  pr_number: number;
+  original_head_sha: string;
+  current_head_sha: string;
+  category: string;
+  severity: string;
+  confidence: string;
+  title: string;
+  file_path?: string;
+  line_number?: number;
+  evidence: string[];
+  published_review_id?: string;
+  published_comment_id?: string;
+  published_to_github: boolean;
+  previous_status?: string;
+  current_status: LifecycleStatus;
+  resolution_notes?: string;
+  verification_evidence?: string;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface RepoReviewSettings {
+  repo_full_name: string;
+  auto_review_enabled: boolean;
+  confidence_threshold: string;
+  updated_by?: string;
+  updated_at?: string;
+}
+
+export interface PRReviewsBundle {
+  repo_full_name: string;
+  pr_number: number;
+  reviews: GitHubReviewRecord[];
+  latest_job: ReviewJobRecord | null;
+  finding_lifecycle: FindingLifecycleRecord[];
+  settings: RepoReviewSettings;
+}
+
+export interface GitHubAppStatus {
+  is_app_configured: boolean;
+  app_name: string;
+  webhook_configured: boolean;
+  analyzer_version: string;
+  confidence_threshold_default: string;
+  required_permissions: Record<string, string>;
+  subscribed_events: string[];
 }
