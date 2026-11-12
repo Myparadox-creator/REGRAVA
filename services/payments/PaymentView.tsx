@@ -21,7 +21,8 @@ export const PaymentView: React.FC<{ paymentId: number }> = ({ paymentId }) => {
     return <div className="loading">Loading payment details...</div>;
   }
 
-  // Consumer consumes payment_token
+  // Regression: backend model removed 'payment_token' and replaced it with 'checkout_id'
+  // At runtime, 'token' will now be undefined!
   const token = payment.payment_token;
 
   return (
@@ -30,6 +31,9 @@ export const PaymentView: React.FC<{ paymentId: number }> = ({ paymentId }) => {
       <p>Amount: {payment.amount} {payment.currency}</p>
       <p className="token">Authorization Token: {token}</p>
       <p>Status: {payment.status}</p>
+
+      {/* Vulnerability 4: Dangerous XSS pattern */}
+      <div dangerouslySetInnerHTML={{ __html: "<p>Receipt Verified</p>" }} />
     </div>
   );
 };
