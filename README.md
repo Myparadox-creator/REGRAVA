@@ -480,6 +480,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 <br/>
 
 **REGRAVA** &bull; *Catch what your diff could break.*  
-Built with ❤️ for full-stack developers and high-assurance engineering teams.
+Built with ❤️ for full-stack developers and high-assurance engineering teams..
 
 </div>
