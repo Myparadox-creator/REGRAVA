@@ -149,8 +149,8 @@ REGRAVA inspects repository source code and active pull request diffs across 7 d
 * **Webhook Re-Review Support**: Subscribed to `issue_comment` events to automatically trigger on-demand reviews when developers comment `@regrava review`, `@regrava re-run`, or `/regrava review`.
 * **In-Dashboard Visual PR View**: Interactive GitHub conversation card mirroring the GitHub PR timeline directly inside the REGRAVA web application.
 
-### 4.6 REGRAVA AI Assistant & Conversational Engine
-* **Objective**: Provides an intelligent, repository-aware conversational developer companion inside REGRAVA (inspired by modern developer AI tools like ChatGPT, Claude, and Antigravity) while preserving the Obsidian Black visual identity.
+### 4.6 REVA — Native AI Assistant & Conversational Engine
+* **Identity**: **REVA** (REGRAVA Evidence-based Vulnerability & Architecture Assistant) is the native intelligent conversational developer companion inside REGRAVA (inspired by modern developer AI tools like ChatGPT, Claude, and Antigravity) while preserving the Obsidian Black visual identity.
 * **Multi-Provider LLM Abstraction**:
   - Abstract base interface (`BaseLLMProvider`) supporting streaming and non-streaming responses via native REST Server-Sent Events (SSE).
   - Primary provider: Google Gemini API (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`) using low-latency SSE streaming.

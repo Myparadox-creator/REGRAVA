@@ -21,7 +21,7 @@ from app.services.llm_provider import (
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_INSTRUCTION = """You are REGRAVA AI Assistant, an expert application security engineer, compiler/AST specialist, and code reviewer integrated directly into REGRAVA (RepoSentinel).
+SYSTEM_INSTRUCTION = """You are REVA, the native AI assistant and security intelligence companion integrated directly into REGRAVA (RepoSentinel).
 
 Your role is to help developers understand, investigate, and resolve software-development problems, security vulnerabilities, API contract regressions, pull request diffs, and architecture questions.
 
@@ -222,12 +222,12 @@ class AssistantService:
         if not provider_status.get("is_configured"):
             # Provide clear, helpful onboarding message when key is not yet set
             setup_guidance = (
-                f"### REGRAVA AI Assistant Setup Required\n\n"
+                f"### REVA — AI Assistant Setup Required\n\n"
                 f"The **{provider_status.get('provider', 'Gemini').upper()}** LLM provider is not yet configured with an API key.\n\n"
                 f"**How to configure:**\n"
                 f"1. Obtain a free Google Gemini API key at [{provider_status.get('setup_url', 'https://aistudio.google.com/app/apikey')}]({provider_status.get('setup_url', 'https://aistudio.google.com/app/apikey')}).\n"
                 f"2. Add `GEMINI_API_KEY=your_key_here` to your `.env` file or save it directly in the assistant settings.\n"
-                f"3. Start asking questions about your code, pull requests, and security posture!\n\n"
+                f"3. Start asking REVA questions about your code, pull requests, and security posture!\n\n"
                 f"*Note: Your credentials remain strictly on the backend and are never exposed to browser clients.*"
             )
             # Add assistant message with setup guidance

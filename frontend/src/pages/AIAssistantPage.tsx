@@ -799,9 +799,9 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <h1 className="text-xs font-bold tracking-tight text-[#F5F6F8]">REGRAVA AI ASSISTANT</h1>
+                <h1 className="text-xs font-bold tracking-tight text-[#F5F6F8]">REVA AI ASSISTANT</h1>
                 <p className="text-[10px] text-[#707783] hidden sm:block">
-                  Your development companion for code, security, and pull requests.
+                  Your intelligent development companion for code, security, and pull requests.
                 </p>
               </div>
             </div>
@@ -898,7 +898,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                     {/* Header info */}
                     <div className="flex items-center gap-2 mb-1.5 px-1">
                       <span className="text-[11px] font-semibold text-[#707783]">
-                        {isUser ? 'You' : 'REGRAVA Assistant'}
+                        {isUser ? 'You' : 'REVA'}
                       </span>
                     </div>
 
@@ -1094,7 +1094,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask REGRAVA about your code, PRs, security findings, or anything you're building..."
+                placeholder="Ask REVA about your code, PRs, security findings, or anything you're building..."
                 rows={1}
                 className="w-full bg-transparent text-[#F5F6F8] placeholder-[#707783] text-[13.5px] leading-relaxed resize-none focus:outline-none px-2 pt-1 max-h-48"
               />
