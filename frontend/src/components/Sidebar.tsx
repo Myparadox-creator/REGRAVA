@@ -11,6 +11,7 @@ import {
   Github,
   X,
   Menu,
+  Sparkles,
 } from 'lucide-react';
 import { GitHubAccount, UserProfile } from '../types';
 
@@ -46,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ShieldAlert,
       badge: openFindingsCount > 0 ? openFindingsCount : undefined,
     },
+    { id: 'assistant', label: 'AI Assistant', icon: Sparkles },
     { id: 'history', label: 'Analysis History', icon: History },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -55,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'security', label: 'Security', icon: ShieldCheck },
     { id: 'repos', label: 'Repos', icon: FolderGit2 },
     { id: 'pulls', label: 'PRs', icon: GitPullRequest },
+    { id: 'assistant', label: 'Assistant', icon: Sparkles },
     {
       id: 'findings',
       label: 'Findings',

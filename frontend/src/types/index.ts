@@ -417,3 +417,45 @@ export interface GitHubAppStatus {
   required_permissions: Record<string, string>;
   subscribed_events: string[];
 }
+
+export type AssistantContextType = 'general' | 'repository' | 'pull_request' | 'finding';
+
+export interface AssistantCitation {
+  file: string;
+  line?: number;
+  end_line?: number;
+  type?: string;
+}
+
+export interface AssistantMessage {
+  id: string;
+  conversation_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  sources?: AssistantCitation[];
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export interface AssistantConversation {
+  id: string;
+  user_id: string;
+  title: string;
+  selected_repo?: string;
+  selected_pr_number?: number;
+  selected_finding_id?: string;
+  created_at: string;
+  updated_at: string;
+  message_count?: number;
+  messages?: AssistantMessage[];
+}
+
+export interface AssistantProviderStatus {
+  is_configured: boolean;
+  provider: string;
+  model: string;
+  error?: string;
+  setup_url?: string;
+  configured_provider?: string;
+  status?: string;
+}

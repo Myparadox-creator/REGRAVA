@@ -213,6 +213,29 @@ class DatabaseManager:
                 processed_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS conversations (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                selected_repo TEXT,
+                selected_pr_number INTEGER,
+                selected_finding_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY,
+                conversation_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                sources_json TEXT NOT NULL DEFAULT '[]',
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
             CREATE INDEX IF NOT EXISTS idx_analyses_user ON pr_analyses(user_id);
             CREATE INDEX IF NOT EXISTS idx_analyses_repo ON pr_analyses(repo_name);
@@ -220,6 +243,8 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS idx_reviews_dedup ON github_reviews(dedup_key);
             CREATE INDEX IF NOT EXISTS idx_lifecycle_repo_pr ON finding_lifecycle(repo_full_name, pr_number);
             CREATE INDEX IF NOT EXISTS idx_lifecycle_fp ON finding_lifecycle(repo_full_name, pr_number, fingerprint);
+            CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
+            CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
         """
         try:
             with self._get_connection() as conn:
@@ -1003,6 +1028,203 @@ class DatabaseManager:
                 return True
             except sqlite3.IntegrityError:
                 return False
+
+    # --- AI Assistant Conversation Management ---
+    def create_conversation(
+        self,
+        user_id: str,
+        title: str = "New Conversation",
+        selected_repo: Optional[str] = None,
+        selected_pr_number: Optional[int] = None,
+        selected_finding_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        cid = conversation_id or str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO conversations (id, user_id, title, selected_repo, selected_pr_number, selected_finding_id, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (cid, user_id, title, selected_repo, selected_pr_number, selected_finding_id, now, now),
+            )
+        return {
+            "id": cid,
+            "user_id": user_id,
+            "title": title,
+            "selected_repo": selected_repo,
+            "selected_pr_number": selected_pr_number,
+            "selected_finding_id": selected_finding_id,
+            "created_at": now,
+            "updated_at": now,
+            "messages": [],
+        }
+
+    def list_conversations(self, user_id: str, search_query: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            if search_query and search_query.strip():
+                q = f"%{search_query.strip().lower()}%"
+                rows = conn.execute(
+                    "SELECT * FROM conversations WHERE user_id = ? AND LOWER(title) LIKE ? "
+                    "ORDER BY updated_at DESC",
+                    (user_id, q),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM conversations WHERE user_id = ? ORDER BY updated_at DESC",
+                    (user_id,),
+                ).fetchall()
+
+            results = []
+            for r in rows:
+                c = dict(r)
+                # Count messages
+                m_count = conn.execute(
+                    "SELECT COUNT(*) as cnt FROM messages WHERE conversation_id = ?",
+                    (c["id"],),
+                ).fetchone()["cnt"]
+                c["message_count"] = m_count
+                results.append(c)
+            return results
+
+    def get_conversation(self, user_id: str, conversation_id: str) -> Optional[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM conversations WHERE id = ? AND user_id = ?",
+                (conversation_id, user_id),
+            ).fetchone()
+            if not row:
+                return None
+            conv = dict(row)
+            m_rows = conn.execute(
+                "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+                (conversation_id,),
+            ).fetchall()
+            messages = []
+            for mr in m_rows:
+                md = dict(mr)
+                try:
+                    md["sources"] = json.loads(md.get("sources_json") or "[]")
+                except Exception:
+                    md["sources"] = []
+                try:
+                    md["metadata"] = json.loads(md.get("metadata_json") or "{}")
+                except Exception:
+                    md["metadata"] = {}
+                messages.append(md)
+            conv["messages"] = messages
+            return conv
+
+    def update_conversation(
+        self,
+        user_id: str,
+        conversation_id: str,
+        title: Optional[str] = None,
+        selected_repo: Optional[str] = None,
+        selected_pr_number: Optional[int] = None,
+        selected_finding_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        conv = self.get_conversation(user_id, conversation_id)
+        if not conv:
+            return None
+        now = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE conversations SET "
+                "title = COALESCE(?, title), "
+                "selected_repo = CASE WHEN ? IS NOT NULL THEN ? ELSE selected_repo END, "
+                "selected_pr_number = CASE WHEN ? IS NOT NULL THEN ? ELSE selected_pr_number END, "
+                "selected_finding_id = CASE WHEN ? IS NOT NULL THEN ? ELSE selected_finding_id END, "
+                "updated_at = ? WHERE id = ? AND user_id = ?",
+                (
+                    title,
+                    selected_repo,
+                    selected_repo,
+                    selected_pr_number,
+                    selected_pr_number,
+                    selected_finding_id,
+                    selected_finding_id,
+                    now,
+                    conversation_id,
+                    user_id,
+                ),
+            )
+        return self.get_conversation(user_id, conversation_id)
+
+    def delete_conversation(self, user_id: str, conversation_id: str) -> bool:
+        with self._get_connection() as conn:
+            cur = conn.execute(
+                "DELETE FROM conversations WHERE id = ? AND user_id = ?",
+                (conversation_id, user_id),
+            )
+            return cur.rowcount > 0
+
+    def add_message(
+        self,
+        conversation_id: str,
+        role: str,
+        content: str,
+        sources: Optional[List[Dict[str, Any]]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        message_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        mid = message_id or str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        sources_json = json.dumps(sources or [])
+        meta_json = json.dumps(metadata or {})
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO messages (id, conversation_id, role, content, sources_json, metadata_json, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (mid, conversation_id, role, content, sources_json, meta_json, now),
+            )
+            # Update parent conversation's updated_at
+            conn.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now, conversation_id))
+
+        return {
+            "id": mid,
+            "conversation_id": conversation_id,
+            "role": role,
+            "content": content,
+            "sources": sources or [],
+            "metadata": metadata or {},
+            "created_at": now,
+        }
+
+    def list_messages(self, conversation_id: str) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+                (conversation_id,),
+            ).fetchall()
+            messages = []
+            for r in rows:
+                d = dict(r)
+                try:
+                    d["sources"] = json.loads(d.get("sources_json") or "[]")
+                except Exception:
+                    d["sources"] = []
+                try:
+                    d["metadata"] = json.loads(d.get("metadata_json") or "{}")
+                except Exception:
+                    d["metadata"] = {}
+                messages.append(d)
+            return messages
+
+    def delete_messages_after(self, conversation_id: str, message_id: str) -> bool:
+        """Delete a message and any messages created after it (for regeneration/retry)."""
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT created_at FROM messages WHERE id = ? AND conversation_id = ?",
+                (message_id, conversation_id),
+            ).fetchone()
+            if not row:
+                return False
+            target_created = row["created_at"]
+            conn.execute(
+                "DELETE FROM messages WHERE conversation_id = ? AND created_at >= ?",
+                (conversation_id, target_created),
+            )
+            return True
 
 
 db = DatabaseManager()

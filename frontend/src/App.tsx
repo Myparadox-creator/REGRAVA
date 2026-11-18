@@ -8,6 +8,7 @@ import { SecurityDashboardPage } from './pages/SecurityDashboardPage';
 import { RepositoriesPage } from './pages/RepositoriesPage';
 import { PullRequestsPage } from './pages/PullRequestsPage';
 import { FindingsPage } from './pages/FindingsPage';
+import { AIAssistantPage } from './pages/AIAssistantPage';
 import { AnalysisHistoryPage } from './pages/AnalysisHistoryPage';
 import { SettingsPage } from './pages/SettingsPage';
 import {
@@ -48,9 +49,11 @@ import {
   updateFindingLifecycleStatus,
 } from './services/api';
 
-const VALID_TABS = ['overview', 'security', 'repos', 'pulls', 'findings', 'history', 'settings'];
+const VALID_TABS = ['overview', 'security', 'repos', 'pulls', 'findings', 'assistant', 'history', 'settings'];
 
 function getTabFromHash(): string {
+  const path = window.location.pathname.replace('/', '').trim().toLowerCase();
+  if (path === 'assistant') return 'assistant';
   const hash = window.location.hash.replace('#', '').trim().toLowerCase();
   return VALID_TABS.includes(hash) ? hash : 'overview';
 }
@@ -587,6 +590,18 @@ export function App() {
               prNumber={currentAnalysis?.pr_number}
               lifecycleRecords={prReviewsBundle?.finding_lifecycle || []}
               latestReviewUrl={prReviewsBundle?.reviews?.[0]?.github_review_url}
+            />
+          )}
+
+          {currentTab === 'assistant' && (
+            <AIAssistantPage
+              repositories={repositories}
+              selectedRepo={selectedRepo}
+              onSelectRepo={handleSelectRepo}
+              pullRequests={pullRequests}
+              currentAnalysis={currentAnalysis}
+              selectedFinding={selectedFinding}
+              onSelectFinding={setSelectedFinding}
             />
           )}
 

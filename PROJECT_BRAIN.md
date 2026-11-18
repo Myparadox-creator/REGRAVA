@@ -149,6 +149,37 @@ REGRAVA inspects repository source code and active pull request diffs across 7 d
 * **Webhook Re-Review Support**: Subscribed to `issue_comment` events to automatically trigger on-demand reviews when developers comment `@regrava review`, `@regrava re-run`, or `/regrava review`.
 * **In-Dashboard Visual PR View**: Interactive GitHub conversation card mirroring the GitHub PR timeline directly inside the REGRAVA web application.
 
+### 4.6 REGRAVA AI Assistant & Conversational Engine
+* **Objective**: Provides an intelligent, repository-aware conversational developer companion inside REGRAVA (inspired by modern developer AI tools like ChatGPT, Claude, and Antigravity) while preserving the Obsidian Black visual identity.
+* **Multi-Provider LLM Abstraction**:
+  - Abstract base interface (`BaseLLMProvider`) supporting streaming and non-streaming responses via native REST Server-Sent Events (SSE).
+  - Primary provider: Google Gemini API (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`) using low-latency SSE streaming.
+  - Pluggable extensions for OpenAI (`gpt-4o`) and Anthropic (`claude-3-5-sonnet`).
+  - Dynamic in-app API key configuration with server-side credential isolation.
+* **Controlled Read-Only Repository Tools (`AssistantTools`)**:
+  - `get_repository_overview`: Repository metadata, default branch, language, and README excerpt.
+  - `list_repository_files`: Directory tree exploration.
+  - `search_repository_code`: Search files, symbols, and routes.
+  - `read_source_file`: Line-numbered source inspection (capped at safe limit) with automatic secret redaction (`[REDACTED_SECRET]`).
+  - `get_pull_request_details` & `get_pull_request_diff`: PR metadata and unified diff patches.
+  - `get_security_findings` & `get_finding_details`: AST findings and multi-commit lifecycle statuses (`Open`, `Fix Attempted`, `Verified Fixed`, etc.).
+  - `get_test_evidence`: Verification status and CI execution evidence.
+  - Strictly READ-ONLY boundary: no file modifications, commits, PR approvals, or arbitrary command execution.
+* **Security & Anti-Prompt-Injection Safeguards**:
+  - Quarantines repository files, diffs, comments, and README instructions inside `<untrusted_repository_content>` tags.
+  - System instructions enforce that repository data must never be interpreted as commands or role overrides.
+  - Automatic credential scrubbing for API tokens, secret keys, and private certificates.
+* **Context Selection Modes**:
+  - `General Chat`: Universal software engineering assistance.
+  - `Repository Context`: Analyzes repository structure, dependencies, routes, and models.
+  - `Pull Request Context`: Explains diff boundaries, why findings were flagged, and test coverage gaps.
+  - `Security Finding Context`: Explains vulnerability root causes, exploitability, and synthesized verification tests.
+* **Citation & Source Extraction**:
+  - Parses code references (e.g. `services/payments/routes.py:28-31`) and outputs structured citations for clickable inspection.
+* **Chat History & User Isolation**:
+  - Persistent SQLite storage (`conversations` and `messages` tables).
+  - Strict tenant isolation: users can only view, query, or delete their own conversation threads.
+
 ---
 
 ## 5. Technology Stack & Dependencies
@@ -198,12 +229,13 @@ reposentinel/
 │   │   ├── api/                      # REST API Endpoints
 │   │   │   ├── ai_steering.py        # /api/steering/prompt & /api/steering/audit
 │   │   │   ├── analysis.py           # /api/analysis/pr, /api/analysis/history
+│   │   │   ├── assistant.py          # /api/assistant/chat, /stream, /conversations, /providers
 │   │   │   ├── auth.py               # /api/auth/google, /api/auth/github, /api/auth/me
 │   │   │   ├── github_reviews.py     # /api/repos/.../pulls/.../review & /api/webhooks/github
 │   │   │   ├── health.py             # /api/health
 │   │   │   └── security.py           # /api/security/posture, /api/security/audit
 │   │   ├── db/
-│   │   │   └── session_db.py         # SQLite database, token revocation & review jobs
+│   │   │   └── session_db.py         # SQLite database, token revocation, review jobs & conversations
 │   │   ├── models/                   # Pydantic Schemas
 │   │   │   ├── analysis.py           # PRAnalysisResult, DiffSummary
 │   │   │   ├── contract.py           # APIContractDelta, SchemaField
@@ -211,11 +243,14 @@ reposentinel/
 │   │   │   └── prompt_steering.py    # SteeredPromptResponse, AIAuditReport
 │   │   ├── services/                 # Core Business Logic
 │   │   │   ├── analysis_service.py   # Orchestrates multi-step PR analysis
+│   │   │   ├── assistant_service.py  # AI Assistant context aggregator, anti-injection & streaming
+│   │   │   ├── assistant_tools.py    # Controlled read-only repository tools with secret redaction
 │   │   │   ├── auth_service.py       # Dual-layer session & OAuth logic
 │   │   │   ├── finding_lifecycle_service.py # Tracks findings across PR commits
 │   │   │   ├── github_app_auth_service.py   # GitHub App JWT & installation token manager
 │   │   │   ├── github_service.py     # GitHub API connector & token manager
 │   │   │   ├── github_webhook_service.py    # Webhook signature validation & event handler
+│   │   │   ├── llm_provider.py       # Provider abstraction (Gemini, OpenAI, Anthropic)
 │   │   │   ├── pull_request_diff_service.py # Diffs, file filtering & context retrieval
 │   │   │   ├── regrava_review_service.py    # Orchestrates end-to-end review lifecycle
 │   │   │   ├── review_formatter.py   # Two-tier Strix-style PR & inline markdown formatter
@@ -223,9 +258,10 @@ reposentinel/
 │   │   │   └── security_posture_service.py  # Fleet health & compliance scoring
 │   │   ├── config.py                 # Application settings & environment variables
 │   │   └── main.py                   # ASGI application setup & router mounting
-│   ├── tests/                        # 67 Pytest Test Cases
+│   ├── tests/                        # 76 Pytest Test Cases
 │   │   ├── test_ai_auditor.py
 │   │   ├── test_api_endpoints.py
+│   │   ├── test_assistant_chat.py    # 9 tests: provider status, streaming, tools, anti-injection
 │   │   ├── test_auth_and_sessions.py
 │   │   ├── test_contract_comparator.py
 │   │   ├── test_git_reader.py
@@ -247,6 +283,7 @@ reposentinel/
 │   │   │   ├── Header.tsx            # Desktop & mobile responsive header
 │   │   │   └── Sidebar.tsx           # Fixed sidebar, mobile drawer & bottom bar
 │   │   ├── pages/                    # Route Views
+│   │   │   ├── AIAssistantPage.tsx   # Conversational AI assistant with Obsidian UI & streaming
 │   │   │   ├── AnalysisHistoryPage.tsx   # Historical scan audit logs
 │   │   │   ├── AuthPage.tsx          # Landing page, AST visualizer & sign-in
 │   │   │   ├── FindingsPage.tsx      # Multi-faceted finding triage center
@@ -391,6 +428,21 @@ The entire REGRAVA frontend is engineered to render cleanly on touchscreens and 
   ```
 * `POST /api/steering/audit` — Audits third-party AI review bot comments against AST facts.
 
+### REGRAVA AI Assistant (`/api/assistant`)
+* `GET /api/assistant/providers/status` — Checks current provider status (`gemini`, `openai`, `anthropic`), readiness, and setup URL.
+* `POST /api/assistant/providers/config` — Registers/updates LLM provider and API key in backend `app_config`.
+* `GET /api/assistant/conversations` — Lists user's conversation threads (with optional title search).
+* `POST /api/assistant/conversations` — Creates a new conversation thread with optional repository/PR context.
+* `GET /api/assistant/conversations/{id}` — Retrieves full conversation history and attached context.
+* `PATCH /api/assistant/conversations/{id}` — Renames conversation or updates attached context.
+* `DELETE /api/assistant/conversations/{id}` — Deletes conversation thread.
+* `POST /api/assistant/chat` — Synchronous non-streaming conversational turn.
+* `POST /api/assistant/chat/stream` — Progressive Server-Sent Events (SSE) streaming chat endpoint.
+* `POST /api/assistant/conversations/{id}/regenerate` — Regenerates previous assistant response.
+* `GET /api/assistant/context/repositories` — Lists authorized repositories for context selector.
+* `GET /api/assistant/context/pull-requests` — Lists pull requests for selected repository.
+* `GET /api/assistant/context/findings` — Lists security/regression findings for context selector.
+
 ---
 
 ## 10. Developer & Operational Runbook
@@ -440,7 +492,7 @@ The entire REGRAVA frontend is engineered to render cleanly on touchscreens and 
 
 ### Running Automated Test Suites
 
-* **Backend Unit & Integration Tests (67 cases across 13 test modules)**:
+* **Backend Unit & Integration Tests (76 cases across 14 test modules)**:
   ```bash
   cd backend
   $env:PYTHONPATH="."  # Windows PowerShell

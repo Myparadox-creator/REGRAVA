@@ -120,9 +120,73 @@ class Settings(BaseModel):
     GITHUB_FRONTEND_URL: str = os.getenv("GITHUB_FRONTEND_URL", "http://localhost:5173")
     GITHUB_TOKEN: Optional[str] = os.getenv("GITHUB_TOKEN") or os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
 
-    # Optional AI Provider
+    # AI Provider & Assistant Settings
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini")
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-2.0-flash")
     ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+
+    def get_llm_provider(self) -> str:
+        try:
+            from app.db.session_db import db
+            val = db.get_config("LLM_PROVIDER")
+            if val:
+                return val.strip().lower()
+        except Exception:
+            pass
+        return (self.LLM_PROVIDER or "gemini").strip().lower()
+
+    def get_llm_model(self) -> str:
+        try:
+            from app.db.session_db import db
+            val = db.get_config("LLM_MODEL")
+            if val:
+                return val.strip()
+        except Exception:
+            pass
+        return self.LLM_MODEL or "gemini-2.0-flash"
+
+    def get_gemini_api_key(self) -> Optional[str]:
+        try:
+            from app.db.session_db import db
+            val = db.get_config("GEMINI_API_KEY")
+            if val:
+                return val.strip()
+        except Exception:
+            pass
+        return self.GEMINI_API_KEY.strip() if self.GEMINI_API_KEY else None
+
+    def get_openai_api_key(self) -> Optional[str]:
+        try:
+            from app.db.session_db import db
+            val = db.get_config("OPENAI_API_KEY")
+            if val:
+                return val.strip()
+        except Exception:
+            pass
+        return self.OPENAI_API_KEY.strip() if self.OPENAI_API_KEY else None
+
+    def get_anthropic_api_key(self) -> Optional[str]:
+        try:
+            from app.db.session_db import db
+            val = db.get_config("ANTHROPIC_API_KEY")
+            if val:
+                return val.strip()
+        except Exception:
+            pass
+        return self.ANTHROPIC_API_KEY.strip() if self.ANTHROPIC_API_KEY else None
+
+    @property
+    def is_llm_configured(self) -> bool:
+        provider = self.get_llm_provider()
+        if provider == "gemini":
+            return bool(self.get_gemini_api_key())
+        elif provider == "openai":
+            return bool(self.get_openai_api_key())
+        elif provider == "anthropic":
+            return bool(self.get_anthropic_api_key())
+        return False
 
     def get_google_client_id(self) -> Optional[str]:
         try:

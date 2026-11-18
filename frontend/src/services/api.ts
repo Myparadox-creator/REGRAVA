@@ -19,6 +19,8 @@ import {
   RepoReviewSettings,
   FindingLifecycleRecord,
   LifecycleStatus,
+  AssistantConversation,
+  AssistantProviderStatus,
 } from '../types';
 
 const API_BASE = '/api';
@@ -532,3 +534,283 @@ export async function updateFindingLifecycleStatus(
     'Failed to update finding lifecycle status'
   );
 }
+
+// =============================================================================
+// REGRAVA AI ASSISTANT API
+// =============================================================================
+
+export async function fetchAssistantProviderStatus(): Promise<AssistantProviderStatus> {
+  return fetchJson<AssistantProviderStatus>(
+    `${API_BASE}/assistant/providers/status`,
+    undefined,
+    'Failed to fetch AI Assistant provider status'
+  );
+}
+
+export async function configureAssistantProvider(
+  provider: string,
+  apiKey?: string,
+  model?: string
+): Promise<AssistantProviderStatus> {
+  return fetchJson<AssistantProviderStatus>(
+    `${API_BASE}/assistant/providers/config`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, api_key: apiKey, model }),
+    },
+    'Failed to configure AI Assistant provider'
+  );
+}
+
+export async function fetchAssistantConversations(query?: string): Promise<AssistantConversation[]> {
+  const q = query ? `?q=${encodeURIComponent(query)}` : '';
+  return fetchJson<AssistantConversation[]>(
+    `${API_BASE}/assistant/conversations${q}`,
+    undefined,
+    'Failed to load assistant conversations'
+  );
+}
+
+export async function createAssistantConversation(payload: {
+  title?: string;
+  selected_repo?: string;
+  selected_pr_number?: number;
+  selected_finding_id?: string;
+}): Promise<AssistantConversation> {
+  return fetchJson<AssistantConversation>(
+    `${API_BASE}/assistant/conversations`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to create new conversation'
+  );
+}
+
+export async function fetchAssistantConversation(conversationId: string): Promise<AssistantConversation> {
+  return fetchJson<AssistantConversation>(
+    `${API_BASE}/assistant/conversations/${encodeURIComponent(conversationId)}`,
+    undefined,
+    'Failed to load conversation details'
+  );
+}
+
+export async function updateAssistantConversation(
+  conversationId: string,
+  payload: {
+    title?: string;
+    selected_repo?: string;
+    selected_pr_number?: number;
+    selected_finding_id?: string;
+  }
+): Promise<AssistantConversation> {
+  return fetchJson<AssistantConversation>(
+    `${API_BASE}/assistant/conversations/${encodeURIComponent(conversationId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Failed to update conversation'
+  );
+}
+
+export async function deleteAssistantConversation(conversationId: string): Promise<{ deleted: boolean }> {
+  return fetchJson<{ deleted: boolean }>(
+    `${API_BASE}/assistant/conversations/${encodeURIComponent(conversationId)}`,
+    { method: 'DELETE' },
+    'Failed to delete conversation'
+  );
+}
+
+export async function streamAssistantChat(
+  payload: {
+    conversation_id: string;
+    message: string;
+    selected_repo?: string;
+    selected_pr_number?: number;
+    selected_finding_id?: string;
+  },
+  onChunk: (delta: string) => void,
+  onDone: (data: { message_id?: string; sources?: any[]; complete_text?: string }) => void,
+  onError: (errorText: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE}/assistant/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      onError(`Request failed (${response.status}): ${errText}`);
+      return;
+    }
+
+    if (!response.body) {
+      onError('Readable stream not supported in this browser.');
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+
+      for (const ev of events) {
+        if (!ev.trim()) continue;
+        const lines = ev.split('\n');
+        let eventType = 'message';
+        let dataStr = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            dataStr = line.slice(6).trim();
+          }
+        }
+
+        if (dataStr) {
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (eventType === 'chunk') {
+              if (parsed.delta) onChunk(parsed.delta);
+            } else if (eventType === 'done') {
+              onDone(parsed);
+            } else if (eventType === 'error') {
+              onError(parsed.error || 'Unknown streaming error');
+            }
+          } catch {
+            // Ignore non-json lines
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      // User aborted stream
+      return;
+    }
+    onError(err.message || 'Error communicating with assistant');
+  }
+}
+
+export async function streamAssistantRegenerate(
+  conversationId: string,
+  payload: {
+    selected_repo?: string;
+    selected_pr_number?: number;
+    selected_finding_id?: string;
+  },
+  onChunk: (delta: string) => void,
+  onDone: (data: { message_id?: string; sources?: any[]; complete_text?: string }) => void,
+  onError: (errorText: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE}/assistant/conversations/${encodeURIComponent(conversationId)}/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      onError(`Regeneration failed (${response.status}): ${errText}`);
+      return;
+    }
+
+    if (!response.body) {
+      onError('Readable stream not supported in this browser.');
+      return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+
+      for (const ev of events) {
+        if (!ev.trim()) continue;
+        const lines = ev.split('\n');
+        let eventType = 'message';
+        let dataStr = '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            dataStr = line.slice(6).trim();
+          }
+        }
+
+        if (dataStr) {
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (eventType === 'chunk') {
+              if (parsed.delta) onChunk(parsed.delta);
+            } else if (eventType === 'done') {
+              onDone(parsed);
+            } else if (eventType === 'error') {
+              onError(parsed.error || 'Unknown streaming error');
+            }
+          } catch {
+            // Ignore non-json lines
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return;
+    }
+    onError(err.message || 'Error communicating with assistant');
+  }
+}
+
+export async function fetchAssistantContextRepositories(): Promise<Array<{ full_name: string; name: string; owner: string; description: string; open_prs_count: number }>> {
+  return fetchJson(
+    `${API_BASE}/assistant/context/repositories`,
+    undefined,
+    'Failed to load repositories for assistant context'
+  );
+}
+
+export async function fetchAssistantContextPullRequests(repoFullName: string): Promise<Array<{ number: number; title: string; author: string; state: string }>> {
+  return fetchJson(
+    `${API_BASE}/assistant/context/pull-requests?repo=${encodeURIComponent(repoFullName)}`,
+    undefined,
+    'Failed to load pull requests for assistant context'
+  );
+}
+
+export async function fetchAssistantContextFindings(repoFullName: string, prNumber?: number): Promise<Array<{ id: string; title: string; severity: string; category: string; file_path?: string; line_number?: number; lifecycle_status?: string }>> {
+  const prQuery = prNumber ? `&pr=${prNumber}` : '';
+  return fetchJson(
+    `${API_BASE}/assistant/context/findings?repo=${encodeURIComponent(repoFullName)}${prQuery}`,
+    undefined,
+    'Failed to load findings for assistant context'
+  );
+}
+
