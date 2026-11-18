@@ -128,6 +128,27 @@ REGRAVA inspects repository source code and active pull request diffs across 7 d
 * Assigns a deterministic letter grade (**A+**, **A**, **B**, **C**, **D**, **F**) based on the 7-layer health checklist.
 * Computes compliance readiness scores for **SOC 2 Type II** and **OWASP Top 10**.
 
+### 4.5 Native GitHub Pull Request Reviewer & Lifecycle Engine
+* **Objective**: Positions REGRAVA directly inside the GitHub PR conversation as an independent, automated code and security reviewer (alongside tools like Strix, CodeRabbit, and Copilot).
+* **Two-Tier Strix Review Format**:
+  1. **Top Pinned PR Summary Comment** (`POST /repos/{owner}/{repo}/issues/{number}/comments`):
+     - `# REGRAVA Security Review` heading.
+     - `### To fix before merging ({count})`: Highlighted with colored badges (🟣 `CRITICAL`, 🔴 `HIGH`, 🟡 `MEDIUM`), finding title, and exact file:line references (e.g. `services/payments/routes.py:28-31`).
+     - `**PR summary:**`: Plain-English summary of changed services and diff boundaries.
+     - `<details><summary><b>Review summary</b></summary>`: Metrics, observations, and audit status.
+     - `<details><summary><b>Ruled out ({count})</b></summary>`: Explicit list of AST security checks that verified clean (SQLi, Command Injection, Secrets, Path Traversal, XSS, Auth/IDOR, etc.).
+     - Footer: Re-run instructions (`Fixed the findings? re-run the review, or tag @regrava in a PR comment to run a fresh review.`).
+  2. **Formal Pull Request Review** (`POST /repos/{owner}/{repo}/pulls/{number}/reviews`, event=`COMMENT`):
+     - Notification banner: *"REGRAVA flagged a new security finding below. See the pinned summary comment for the full PR status."*
+     - Anchored inline comments on changed diff lines with **Problem**, **Why it matters**, **Recommended action**, **Confidence**, and **REGRAVA finding ID**.
+* **Dual-Token Authentication Architecture**:
+  - Automatically uses GitHub App installation tokens when `GITHUB_APP_ID` and private key are configured.
+  - Automatically falls back to the connected user's authorized GitHub OAuth access token (or PAT in `GITHUB_TOKEN`) when App credentials are not configured, ensuring live reviews publish in any environment without falling back to local dry-run.
+* **Review Idempotency & Duplicate Prevention**: Stable composite key (`repo_id:pr_number:head_sha:version:fingerprints`) prevents duplicate review comments on identical commits.
+* **Cross-Commit Finding Lifecycle Tracking**: Tracks findings across revisions (`Open`, `Fix Attempted`, `Verified Fixed`, `Still Present`, `Dismissed`, `Accepted`, `Inconclusive`).
+* **Webhook Re-Review Support**: Subscribed to `issue_comment` events to automatically trigger on-demand reviews when developers comment `@regrava review`, `@regrava re-run`, or `/regrava review`.
+* **In-Dashboard Visual PR View**: Interactive GitHub conversation card mirroring the GitHub PR timeline directly inside the REGRAVA web application.
+
 ---
 
 ## 5. Technology Stack & Dependencies
@@ -178,10 +199,11 @@ reposentinel/
 │   │   │   ├── ai_steering.py        # /api/steering/prompt & /api/steering/audit
 │   │   │   ├── analysis.py           # /api/analysis/pr, /api/analysis/history
 │   │   │   ├── auth.py               # /api/auth/google, /api/auth/github, /api/auth/me
+│   │   │   ├── github_reviews.py     # /api/repos/.../pulls/.../review & /api/webhooks/github
 │   │   │   ├── health.py             # /api/health
 │   │   │   └── security.py           # /api/security/posture, /api/security/audit
 │   │   ├── db/
-│   │   │   └── session_db.py         # SQLite database & token revocation tables
+│   │   │   └── session_db.py         # SQLite database, token revocation & review jobs
 │   │   ├── models/                   # Pydantic Schemas
 │   │   │   ├── analysis.py           # PRAnalysisResult, DiffSummary
 │   │   │   ├── contract.py           # APIContractDelta, SchemaField
@@ -190,16 +212,24 @@ reposentinel/
 │   │   ├── services/                 # Core Business Logic
 │   │   │   ├── analysis_service.py   # Orchestrates multi-step PR analysis
 │   │   │   ├── auth_service.py       # Dual-layer session & OAuth logic
+│   │   │   ├── finding_lifecycle_service.py # Tracks findings across PR commits
+│   │   │   ├── github_app_auth_service.py   # GitHub App JWT & installation token manager
 │   │   │   ├── github_service.py     # GitHub API connector & token manager
-│   │   │   └── security_posture_service.py # Fleet health & compliance scoring
+│   │   │   ├── github_webhook_service.py    # Webhook signature validation & event handler
+│   │   │   ├── pull_request_diff_service.py # Diffs, file filtering & context retrieval
+│   │   │   ├── regrava_review_service.py    # Orchestrates end-to-end review lifecycle
+│   │   │   ├── review_formatter.py   # Two-tier Strix-style PR & inline markdown formatter
+│   │   │   ├── review_publisher_service.py  # Dual-token GitHub API review publisher
+│   │   │   └── security_posture_service.py  # Fleet health & compliance scoring
 │   │   ├── config.py                 # Application settings & environment variables
 │   │   └── main.py                   # ASGI application setup & router mounting
-│   ├── tests/                        # 51 Pytest Test Cases
+│   ├── tests/                        # 67 Pytest Test Cases
 │   │   ├── test_ai_auditor.py
 │   │   ├── test_api_endpoints.py
 │   │   ├── test_auth_and_sessions.py
 │   │   ├── test_contract_comparator.py
 │   │   ├── test_git_reader.py
+│   │   ├── test_github_pr_reviewer.py# 13 tests: Strix layout, dual-token, webhooks, lifecycle
 │   │   ├── test_pr_analysis.py
 │   │   ├── test_prompt_generator.py
 │   │   ├── test_python_parser.py
@@ -323,6 +353,14 @@ The entire REGRAVA frontend is engineered to render cleanly on touchscreens and 
 * `POST /api/auth/token` — Connects a direct GitHub Personal Access Token (PAT).
 * `POST /api/auth/logout` — Revokes session token and clears cookies.
 
+### Native GitHub Pull Request Reviewer (`/api/repos` & `/api/webhooks`)
+* `POST /api/repos/{owner}/{repo}/pulls/{number}/review` — Triggers an asynchronous or synchronous pull request review.
+* `GET /api/reviews/jobs/{job_id}` — Polls review job execution state, progress messages, and published result.
+* `GET /api/repos/{owner}/{repo}/pulls/{number}/review/latest` — Fetches the latest review status, commit SHA, and findings.
+* `GET /api/repos/{owner}/{repo}/settings` — Retrieves repository-level configuration (e.g. auto-review toggle).
+* `POST /api/repos/{owner}/{repo}/settings` — Updates repository-level configuration.
+* `POST /api/webhooks/github` — GitHub App webhook receiver (`pull_request`, `issue_comment`, `installation`, `installation_repositories`).
+
 ### PR Analysis (`/api/analysis`)
 * `POST /api/analysis/pr` — Scans a pull request:
   ```json
@@ -402,11 +440,11 @@ The entire REGRAVA frontend is engineered to render cleanly on touchscreens and 
 
 ### Running Automated Test Suites
 
-* **Backend Unit & Integration Tests (51 cases)**:
+* **Backend Unit & Integration Tests (67 cases across 13 test modules)**:
   ```bash
   cd backend
   $env:PYTHONPATH="."  # Windows PowerShell
-  pytest tests
+  pytest tests -v
   ```
 * **Frontend Type-Check & Build Verification**:
   ```bash
