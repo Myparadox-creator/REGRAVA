@@ -238,6 +238,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [selectedProviderInput, setSelectedProviderInput] = useState('gemini');
+  const [selectedModelInput, setSelectedModelInput] = useState('gemini-2.5-flash');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
 
@@ -303,6 +304,9 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
       const status = await fetchAssistantProviderStatus();
       setProviderStatus(status);
       setSelectedProviderInput(status.configured_provider || 'gemini');
+      if (status.model) {
+        setSelectedModelInput(status.model);
+      }
     } catch {
       // Offline fallback
     }
@@ -483,7 +487,22 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
         setIsGenerating(false);
         setStreamingDelta('');
         setAbortController(null);
-        alert(errText);
+        setActiveConversation((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            messages: [
+              ...(prev.messages || []),
+              {
+                id: `err-${Date.now()}`,
+                conversation_id: activeConvId || '',
+                role: 'assistant',
+                content: `⚠️ **AI Service Notification**\n\n${errText}\n\n*Tip: You can switch models or update your API key via the Key icon at the bottom of the left sidebar.*`,
+                created_at: new Date().toISOString(),
+              },
+            ],
+          };
+        });
       },
       controller.signal
     );
@@ -533,7 +552,22 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
         setIsGenerating(false);
         setStreamingDelta('');
         setAbortController(null);
-        alert(errText);
+        setActiveConversation((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            messages: [
+              ...(prev.messages || []),
+              {
+                id: `err-${Date.now()}`,
+                conversation_id: activeConvId || '',
+                role: 'assistant',
+                content: `⚠️ **AI Service Notification**\n\n${errText}\n\n*Tip: You can switch models or update your API key via the Key icon at the bottom of the left sidebar.*`,
+                created_at: new Date().toISOString(),
+              },
+            ],
+          };
+        });
       },
       controller.signal
     );
@@ -543,7 +577,11 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
     setIsSavingConfig(true);
     setConfigError(null);
     try {
-      const updated = await configureAssistantProvider(selectedProviderInput, apiKeyInput);
+      const updated = await configureAssistantProvider(
+        selectedProviderInput,
+        apiKeyInput || undefined,
+        selectedModelInput
+      );
       setProviderStatus(updated);
       setIsConfigModalOpen(false);
       setApiKeyInput('');
@@ -1173,12 +1211,48 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                 <label className="text-xs font-semibold text-[#8E95A2] block mb-1">Provider</label>
                 <select
                   value={selectedProviderInput}
-                  onChange={(e) => setSelectedProviderInput(e.target.value)}
+                  onChange={(e) => {
+                    const nextProv = e.target.value;
+                    setSelectedProviderInput(nextProv);
+                    if (nextProv === 'gemini') setSelectedModelInput('gemini-2.5-flash');
+                    else if (nextProv === 'openai') setSelectedModelInput('gpt-4o');
+                    else if (nextProv === 'anthropic') setSelectedModelInput('claude-3-5-sonnet-20241022');
+                  }}
                   className="w-full bg-[#14171E] border border-[#252932] rounded-lg px-3 py-2 text-xs text-[#F5F6F8] focus:outline-none focus:border-[#7657FF]"
                 >
-                  <option value="gemini">Google Gemini (Recommended - Free API Tier)</option>
-                  <option value="openai">OpenAI (GPT-4o)</option>
+                  <option value="gemini">Google Gemini (Recommended - Free Tier Available)</option>
+                  <option value="openai">OpenAI (GPT-4o, o3-mini)</option>
                   <option value="anthropic">Anthropic (Claude 3.5 Sonnet)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[#8E95A2] block mb-1">Model</label>
+                <select
+                  value={selectedModelInput}
+                  onChange={(e) => setSelectedModelInput(e.target.value)}
+                  className="w-full bg-[#14171E] border border-[#252932] rounded-lg px-3 py-2 text-xs text-[#F5F6F8] focus:outline-none focus:border-[#7657FF]"
+                >
+                  {selectedProviderInput === 'gemini' && (
+                    <>
+                      <option value="gemini-2.5-flash">gemini-2.5-flash (Recommended — High Speed)</option>
+                      <option value="gemini-1.5-flash">gemini-1.5-flash (Stable LTS)</option>
+                      <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning & 2M Context)</option>
+                    </>
+                  )}
+                  {selectedProviderInput === 'openai' && (
+                    <>
+                      <option value="gpt-4o">gpt-4o (High Performance)</option>
+                      <option value="gpt-4o-mini">gpt-4o-mini (Lightweight & Fast)</option>
+                      <option value="o3-mini">o3-mini (Advanced Reasoning)</option>
+                    </>
+                  )}
+                  {selectedProviderInput === 'anthropic' && (
+                    <>
+                      <option value="claude-3-5-sonnet-20241022">claude-3-5-sonnet-20241022 (Best Code Auditing)</option>
+                      <option value="claude-3-5-haiku-20241022">claude-3-5-haiku-20241022 (Fast & Compact)</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -1188,7 +1262,11 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                 </label>
                 <input
                   type="password"
-                  placeholder="Paste your API key..."
+                  placeholder={
+                    providerStatus?.is_configured
+                      ? 'Enter new API key (or leave blank to keep current)...'
+                      : 'Paste your API key...'
+                  }
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   className="w-full bg-[#14171E] border border-[#252932] rounded-lg px-3 py-2 text-xs text-[#F5F6F8] focus:outline-none focus:border-[#7657FF]"
@@ -1223,7 +1301,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
               </button>
               <button
                 onClick={handleSaveProviderConfig}
-                disabled={isSavingConfig || !apiKeyInput.trim()}
+                disabled={isSavingConfig || (!apiKeyInput.trim() && !providerStatus?.is_configured)}
                 className="px-4 py-1.5 rounded-lg bg-[#7657FF] hover:bg-[#8B6EFF] text-xs font-semibold text-[#F5F6F8] disabled:opacity-50"
               >
                 {isSavingConfig ? 'Saving...' : 'Save Configuration'}
