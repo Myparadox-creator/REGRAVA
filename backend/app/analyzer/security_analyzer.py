@@ -226,8 +226,16 @@ class SecurityAnalyzer:
 
         lines = content.splitlines()
         module_has_auth_guard = self._has_router_or_middleware_auth_guard(content, context_files)
+        dynamic_path_vars: set = set()
 
         for node in ast.walk(tree):
+            # Track dynamic path formatting in assignments
+            if isinstance(node, ast.Assign):
+                val = node.value
+                if isinstance(val, (ast.JoinedStr, ast.BinOp)):
+                    for tgt in node.targets:
+                        if isinstance(tgt, ast.Name):
+                            dynamic_path_vars.add(tgt.id)
             # B1-a. SQL Injection: Raw SQL string formatting in assignments (e.g. query = f"SELECT ... {id}")
             if isinstance(node, ast.Assign):
                 val = node.value
@@ -385,7 +393,9 @@ class SecurityAnalyzer:
                 # D1. Path Traversal: open() with user-controlled path string formatting
                 if func_name == "open" and node.args:
                     first_arg = node.args[0]
-                    if isinstance(first_arg, (ast.JoinedStr, ast.BinOp)):
+                    if isinstance(first_arg, (ast.JoinedStr, ast.BinOp)) or (
+                        isinstance(first_arg, ast.Name) and first_arg.id in dynamic_path_vars
+                    ):
                         snippet = lines[node.lineno - 1].strip() if node.lineno <= len(lines) else ""
                         findings.append(
                             Finding(

@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import re
 from typing import Any, Dict, List, Optional
 from fastapi import BackgroundTasks
 from app.config import settings
@@ -86,6 +87,15 @@ class GitHubWebhookService:
         # 3. Pull Request events
         if event_type == "pull_request":
             return await self._handle_pull_request(
+                action=action,
+                payload=payload,
+                background_tasks=background_tasks,
+                run_sync=run_sync,
+            )
+
+        # 4. Issue Comment events (e.g. "@regrava review", "@regrava re-run", "/regrava review")
+        if event_type == "issue_comment":
+            return await self._handle_issue_comment(
                 action=action,
                 payload=payload,
                 background_tasks=background_tasks,
@@ -239,6 +249,80 @@ class GitHubWebhookService:
             "repo_full_name": repo_full_name,
             "pr_number": pr_number,
             "action": action,
+        }
+
+    async def _handle_issue_comment(
+        self,
+        action: str,
+        payload: Dict[str, Any],
+        background_tasks: Optional[BackgroundTasks],
+        run_sync: bool = False,
+    ) -> Dict[str, Any]:
+        if action not in ("created", "edited"):
+            return {"status": "ignored", "reason": f"Issue comment action '{action}' is not subscribed."}
+
+        issue = payload.get("issue") or {}
+        if not issue.get("pull_request"):
+            return {"status": "ignored", "reason": "Comment is not on a pull request."}
+
+        comment = payload.get("comment") or {}
+        body = comment.get("body", "")
+        author = (comment.get("user") or {}).get("login", "")
+
+        # Skip comments posted by bots to prevent feedback loops
+        if "[bot]" in author.lower() or author.lower() in ("regrava", "regrava-scanner"):
+            return {"status": "ignored", "reason": "Comment was posted by a bot."}
+
+        # Check for trigger phrase: @regrava, @regrava review, @regrava re-run, /regrava review
+        if not re.search(r"(@regrava|/regrava)\b", body, re.IGNORECASE):
+            return {"status": "ignored", "reason": "Comment does not mention @regrava."}
+
+        repo_obj = payload.get("repository") or {}
+        repo_full_name = repo_obj.get("full_name")
+        pr_number = issue.get("number")
+        if not repo_full_name or not pr_number:
+            return {"status": "ignored", "reason": "Missing repository or PR number."}
+
+        owner, repo = repo_full_name.split("/", 1)
+        inst_obj = payload.get("installation") or {}
+        inst_id = str(inst_obj.get("id", "")) if inst_obj.get("id") else None
+
+        user_id = db.get_user_id_for_repo(repo_full_name)
+
+        job = regrava_review_service.authorize_and_create_job(
+            user_id=user_id,
+            owner=owner,
+            repo=repo,
+            pr_number=int(pr_number),
+            dry_run=False,
+            mode="comment_trigger",
+        )
+
+        review_args = dict(
+            job_id=job["job_id"],
+            user_id=user_id,
+            owner=owner,
+            repo=repo,
+            pr_number=int(pr_number),
+            installation_id=inst_id,
+            force_re_review=True,
+            dry_run=False,
+            mode="comment_trigger",
+            triggered_by=f"comment:@{author}",
+        )
+
+        if run_sync or background_tasks is None:
+            await regrava_review_service.execute_review_job(**review_args)
+        else:
+            background_tasks.add_task(regrava_review_service.execute_review_job, **review_args)
+
+        return {
+            "status": "review_triggered",
+            "job_id": job["job_id"],
+            "repo_full_name": repo_full_name,
+            "pr_number": pr_number,
+            "trigger": "comment",
+            "author": author,
         }
 
 

@@ -326,7 +326,24 @@ class RegravaReviewService:
             # --- Stage 4: Publishing Review to GitHub ---
             db.update_review_job(job_id, state="publishing_review", steps=steps)
 
-            use_dry_run = dry_run or pr_context.get("is_demo", False) or not github_app_auth.is_configured()
+            # Resolve user GitHub OAuth token or personal token for dual-mode publishing
+            user_token = pr_context.get("user_token")
+            if not user_token and user_id:
+                account = db.get_github_account(user_id)
+                if account and account.get("access_token"):
+                    tok = account["access_token"]
+                    if tok and not str(tok).startswith("demo"):
+                        user_token = str(tok)
+            if not user_token:
+                user_token = db.get_token_for_repo(full_name) or getattr(settings, "GITHUB_TOKEN", None)
+
+            # Determine whether live publishing is possible
+            has_credentials = (
+                (github_app_auth.is_configured() and pr_context.get("installation_id"))
+                or bool(user_token)
+            )
+            use_dry_run = dry_run or pr_context.get("is_demo", False) or not has_credentials
+
             review_record = await review_publisher.publish_review(
                 repo_full_name=full_name,
                 repo_id=repo_id,
@@ -336,6 +353,7 @@ class RegravaReviewService:
                 dedup_key=dedup_info["dedup_key"],
                 review_payload=review_payload,
                 installation_id=pr_context.get("installation_id"),
+                user_token=user_token,
                 mode=mode,
                 triggered_by=triggered_by or user_id,
                 dry_run=use_dry_run,

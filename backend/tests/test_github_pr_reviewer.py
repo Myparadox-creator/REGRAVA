@@ -632,5 +632,214 @@ def test_context_aware_authorization_middleware_reduces_false_positives():
     assert len(auth_findings) == 0
 
 
+@pytest.mark.asyncio
+async def test_11_strix_style_review_format_and_pinned_summary(isolated_env, monkeypatch):
+    """
+    Test 11: Verify full Strix-matching structure:
+    - Pinned summary comment with '# REGRAVA Security Review'
+    - 'To fix before merging' with colored severity badges (🔴 HIGH) and file:line references
+    - PR summary
+    - Collapsible 'Review summary'
+    - Collapsible 'Ruled out' with verified clean categories
+    - Re-run instructions referencing @regrava
+    - Formal review comment containing 'REGRAVA flagged a new security finding below'
+    """
+    test_db = isolated_env
+    user, _ = _create_live_github_user(test_db, "dev@acme.io", ["test/pr-security-and-regression-demo"])
+
+    vulnerable_code = (
+        "# Handler with Path Traversal\n"
+        "def download_receipt(filename: str):\n"
+        "    file_path = f'/var/receipts/{filename}'\n"
+        "    with open(file_path, 'r') as f:\n"
+        "        return {'receipt': f.read()}\n"
+    )
+    patch = (
+        "@@ -0,0 +1,5 @@\n"
+        "+# Handler with Path Traversal\n"
+        "+def download_receipt(filename: str):\n"
+        "+    file_path = f'/var/receipts/{filename}'\n"
+        "+    with open(file_path, 'r') as f:\n"
+        "+        return {'receipt': f.read()}"
+    )
+
+    pr_ctx = _make_mock_pr_context(
+        "test",
+        "pr-security-and-regression-demo",
+        1,
+        "ff7ed60",
+        files=[{
+            "filename": "services/payments/routes.py",
+            "status": "modified",
+            "base_content": "",
+            "head_content": vulnerable_code,
+            "patch": patch,
+        }],
+    )
+    pr_ctx["description"] = "This PR reworks the demo payments service: it renames payment_token to checkout_id."
+
+    monkeypatch.setattr(pr_diff_service, "fetch_pr_context", lambda **kw: _async_val(pr_ctx))
+    monkeypatch.setattr(pr_diff_service, "get_latest_pr_head_sha", lambda **kw: _async_val("ff7ed60"))
+
+    captured_calls = []
+
+    async def mock_req(installation_id, method, url, json_body=None, **kwargs):
+        captured_calls.append({"method": method, "url": url, "body": json_body})
+        if method == "GET" and url.endswith("/issues/1/comments"):
+            return _mock_response(200, [])
+        if method == "POST" and url.endswith("/issues/1/comments"):
+            return _mock_response(201, {"id": 7001, "html_url": "https://github.com/test/pr-security-and-regression-demo/issues/1#issuecomment-7001"})
+        if method == "POST" and url.endswith("/pulls/1/reviews"):
+            return _mock_response(201, {"id": 88099, "html_url": "https://github.com/test/pr-security-and-regression-demo/pull/1#pullrequestreview-88099"})
+        if method == "GET" and url.endswith("/reviews/88099/comments"):
+            return _mock_response(200, [{"id": 99099, "path": "services/payments/routes.py", "line": 28, "html_url": "https://github.com/test/pr-security-and-regression-demo/pull/1#discussion_r99099"}])
+        return _mock_response(200, [])
+
+    monkeypatch.setattr(github_app_auth, "request_with_installation", mock_req)
+
+    job = regrava_review_service.authorize_and_create_job(user["id"], "test", "pr-security-and-regression-demo", 1)
+    final_job = await regrava_review_service.execute_review_job(
+        job_id=job["job_id"],
+        user_id=user["id"],
+        owner="test",
+        repo="pr-security-and-regression-demo",
+        pr_number=1,
+    )
+
+    assert final_job["state"] == "published"
+
+    # Verify Tier 1: Top issue summary comment was posted
+    issue_comments = [c for c in captured_calls if c["method"] == "POST" and "/issues/1/comments" in c["url"]]
+    assert len(issue_comments) == 1
+    top_comment_body = issue_comments[0]["body"]["body"]
+
+    assert "# REGRAVA Security Review" in top_comment_body
+    assert "To fix before merging" in top_comment_body
+    assert "🔴 **HIGH**" in top_comment_body
+    assert "services/payments/routes.py" in top_comment_body
+    assert "**PR summary:**" in top_comment_body
+    assert "<summary><b>Review summary</b></summary>" in top_comment_body
+    assert "<summary><b>Ruled out (" in top_comment_body
+    assert "SQL Injection" in top_comment_body
+    assert "tag `@regrava` in a PR comment to run a fresh review" in top_comment_body
+    assert "Reviewed by **REGRAVA**" in top_comment_body
+
+    # Verify Tier 2: PR Review was posted with Strix notification banner & inline comment
+    pr_reviews = [c for c in captured_calls if c["method"] == "POST" and "/pulls/1/reviews" in c["url"]]
+    assert len(pr_reviews) == 1
+    review_call = pr_reviews[0]["body"]
+    assert "REGRAVA flagged a new security finding below" in review_call["body"]
+    assert len(review_call["comments"]) == 1
+    assert "### 🔴 HIGH —" in review_call["comments"][0]["body"]
+
+
+@pytest.mark.asyncio
+async def test_12_dual_token_publishing_with_user_oauth_token(isolated_env, monkeypatch):
+    """
+    Test 12: When GitHub App credentials are not configured, REGRAVA automatically
+    falls back to the connected user's authorized GitHub OAuth access token and publishes
+    directly to GitHub without falling back to local dry-run.
+    """
+    test_db = isolated_env
+    user, _ = _create_live_github_user(test_db, "oauth-user@acme.io", ["acme/web-app"])
+
+    # Disable GitHub App credentials to force OAuth token path
+    monkeypatch.setattr(settings, "GITHUB_APP_ID", "")
+    monkeypatch.setattr(settings, "GITHUB_APP_PRIVATE_KEY", "")
+    assert not github_app_auth.is_configured()
+
+    code = "def query_db(uid):\n    q = f'SELECT * FROM u WHERE id={uid}'\n"
+    patch = "@@ -0,0 +1,2 @@\n+def query_db(uid):\n+    q = f'SELECT * FROM u WHERE id={uid}'"
+
+    pr_ctx = _make_mock_pr_context(
+        "acme", "web-app", 4, "sha_oauth_123",
+        files=[{"filename": "app/db.py", "status": "added", "base_content": "", "head_content": code, "patch": patch}],
+        installation_id=None,
+    )
+
+    monkeypatch.setattr(pr_diff_service, "fetch_pr_context", lambda **kw: _async_val(pr_ctx))
+    monkeypatch.setattr(pr_diff_service, "get_latest_pr_head_sha", lambda **kw: _async_val("sha_oauth_123"))
+
+    dispatched_via_user_token = False
+
+    async def mock_dispatch(auth_mode, installation_id, token, method, url, json_body=None, **kwargs):
+        nonlocal dispatched_via_user_token
+        if auth_mode == "token" and token == "gho_mock_user_token":
+            dispatched_via_user_token = True
+            if method == "GET" and "/issues/4/comments" in url:
+                return _mock_response(200, [])
+            if method == "POST" and "/issues/4/comments" in url:
+                return _mock_response(201, {"id": 1111})
+            if method == "POST" and "/pulls/4/reviews" in url:
+                return _mock_response(201, {"id": 2222, "html_url": "https://github.com/acme/web-app/pull/4#pullrequestreview-2222"})
+            if method == "GET" and "/reviews/2222/comments" in url:
+                return _mock_response(200, [])
+        return _mock_response(404, {})
+
+    monkeypatch.setattr(review_publisher, "_dispatch_github_request", mock_dispatch)
+
+    job = regrava_review_service.authorize_and_create_job(user["id"], "acme", "web-app", 4)
+    final_job = await regrava_review_service.execute_review_job(
+        job_id=job["job_id"],
+        user_id=user["id"],
+        owner="acme",
+        repo="web-app",
+        pr_number=4,
+    )
+
+    assert final_job["state"] == "published"
+    assert dispatched_via_user_token is True
+
+    review_record = test_db.get_github_review(final_job["review_record_id"])
+    assert review_record["publication_status"] == "published"
+    assert review_record["github_review_id"] == "2222"
+
+
+@pytest.mark.asyncio
+async def test_13_webhook_issue_comment_triggers_regrava_review(isolated_env, monkeypatch):
+    """
+    Test 13: When a developer comments '@regrava review' on a PR, the issue_comment
+    webhook triggers an automatic re-review job with mode='comment_trigger'.
+    """
+    from app.services.github_webhook_service import github_webhook_service
+
+    test_db = isolated_env
+    user, _ = _create_live_github_user(test_db, "collaborator@acme.io", ["acme/api"])
+
+    review_executed = False
+
+    async def mock_execute(job_id, user_id, owner, repo, pr_number, **kwargs):
+        nonlocal review_executed
+        review_executed = True
+        return {"job_id": job_id, "state": "published"}
+
+    monkeypatch.setattr(regrava_review_service, "execute_review_job", mock_execute)
+
+    payload = {
+        "action": "created",
+        "issue": {
+            "number": 88,
+            "pull_request": {"url": "https://api.github.com/repos/acme/api/pulls/88"},
+        },
+        "repository": {"full_name": "acme/api"},
+        "comment": {
+            "body": "Fixed the findings! @regrava please re-review this PR",
+            "user": {"login": "collaborator"},
+        },
+    }
+
+    res = await github_webhook_service.process_event(
+        event_type="issue_comment",
+        delivery_id="deliv-comment-123",
+        payload=payload,
+        run_sync=True,
+    )
+
+    assert res["status"] == "review_triggered"
+    assert res["trigger"] == "comment"
+    assert res["pr_number"] == 88
+    assert review_executed is True
+
+
 async def _async_val(v):
     return v

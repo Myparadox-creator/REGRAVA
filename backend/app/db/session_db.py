@@ -377,6 +377,38 @@ class DatabaseManager:
         repos = account.get("authorized_repos", [])
         return repo_name in repos or any(r.lower() == repo_name.lower() for r in repos)
 
+    def get_token_for_repo(self, repo_name: str) -> Optional[str]:
+        """Find a valid GitHub access token authorized for this repository."""
+        target = repo_name.lower()
+        with self._get_connection() as conn:
+            rows = conn.execute(
+                "SELECT access_token, authorized_repos FROM github_accounts WHERE access_token IS NOT NULL"
+            ).fetchall()
+            for r in rows:
+                try:
+                    repos = json.loads(r["authorized_repos"] or "[]")
+                    if any(rep.lower() == target for rep in repos):
+                        tok = r["access_token"]
+                        if tok and not tok.startswith("demo"):
+                            return tok
+                except Exception:
+                    continue
+        return None
+
+    def get_user_id_for_repo(self, repo_name: str) -> Optional[str]:
+        """Find the user ID who authorized this repository."""
+        target = repo_name.lower()
+        with self._get_connection() as conn:
+            rows = conn.execute("SELECT user_id, authorized_repos FROM github_accounts").fetchall()
+            for r in rows:
+                try:
+                    repos = json.loads(r["authorized_repos"] or "[]")
+                    if any(rep.lower() == target for rep in repos):
+                        return r["user_id"]
+                except Exception:
+                    continue
+        return None
+
     # --- PR Analyses History ---
     def save_pr_analysis(
         self,

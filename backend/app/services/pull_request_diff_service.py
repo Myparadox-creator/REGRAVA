@@ -445,6 +445,7 @@ class PullRequestDiffService:
             "context_files": context_files,
             "diff_maps": diff_maps,
             "installation_id": resolved_inst_id,
+            "user_token": user_token,
             "is_demo": False,
         }
 

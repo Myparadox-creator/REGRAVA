@@ -57,6 +57,7 @@ def get_github_app_status(current_user: Dict[str, Any] = Depends(get_current_use
         },
         "subscribed_events": [
             "pull_request",
+            "issue_comment",
             "installation",
             "installation_repositories",
         ],
