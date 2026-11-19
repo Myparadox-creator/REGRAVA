@@ -21,6 +21,9 @@ import {
   LifecycleStatus,
   AssistantConversation,
   AssistantProviderStatus,
+  IssueItem,
+  IssueSentinelStats,
+  IssueSentinelSettings,
 } from '../types';
 
 const API_BASE = '/api';
@@ -813,4 +816,96 @@ export async function fetchAssistantContextFindings(repoFullName: string, prNumb
     'Failed to load findings for assistant context'
   );
 }
+
+// --- Issue Sentinel API ---
+export async function fetchRepoIssues(
+  owner: string,
+  repo: string,
+  state: string = 'open'
+): Promise<IssueItem[]> {
+  return fetchJson<IssueItem[]>(
+    `${API_BASE}/repos/${owner}/${repo}/issues?state=${state}`,
+    undefined,
+    `Failed to fetch issues for ${owner}/${repo}`
+  );
+}
+
+export async function fetchRepoIssue(
+  owner: string,
+  repo: string,
+  issueNumber: number
+): Promise<IssueItem> {
+  return fetchJson<IssueItem>(
+    `${API_BASE}/repos/${owner}/${repo}/issues/${issueNumber}`,
+    undefined,
+    `Failed to fetch issue #${issueNumber}`
+  );
+}
+
+export async function triageRepoIssue(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  autoClose: boolean = true,
+  dryRun: boolean = false
+): Promise<any> {
+  return fetchJson<any>(
+    `${API_BASE}/repos/${owner}/${repo}/issues/${issueNumber}/triage`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto_close: autoClose, dry_run: dryRun }),
+    },
+    `Failed to triage issue #${issueNumber}`
+  );
+}
+
+export async function reopenRepoIssue(
+  owner: string,
+  repo: string,
+  issueNumber: number
+): Promise<{ status: string; repo_full_name: string; issue_number: number }> {
+  return fetchJson<{ status: string; repo_full_name: string; issue_number: number }>(
+    `${API_BASE}/repos/${owner}/${repo}/issues/${issueNumber}/reopen`,
+    { method: 'POST' },
+    `Failed to reopen issue #${issueNumber}`
+  );
+}
+
+export async function fetchIssueStats(repo?: string): Promise<IssueSentinelStats> {
+  const query = repo ? `?repo=${encodeURIComponent(repo)}` : '';
+  return fetchJson<IssueSentinelStats>(
+    `${API_BASE}/issues/stats${query}`,
+    undefined,
+    'Failed to fetch issue stats'
+  );
+}
+
+export async function fetchRepoSentinelSettings(
+  owner: string,
+  repo: string
+): Promise<IssueSentinelSettings> {
+  return fetchJson<IssueSentinelSettings>(
+    `${API_BASE}/repos/${owner}/${repo}/issues/settings`,
+    undefined,
+    `Failed to fetch issue sentinel settings for ${owner}/${repo}`
+  );
+}
+
+export async function updateRepoSentinelSettings(
+  owner: string,
+  repo: string,
+  data: { enabled: boolean; auto_close: boolean; mode: string }
+): Promise<IssueSentinelSettings> {
+  return fetchJson<IssueSentinelSettings>(
+    `${API_BASE}/repos/${owner}/${repo}/issues/settings`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    },
+    `Failed to update issue sentinel settings for ${owner}/${repo}`
+  );
+}
+
 

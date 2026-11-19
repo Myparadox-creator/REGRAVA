@@ -17,6 +17,7 @@ from app.api.github_reviews import router as github_reviews_router
 from app.api.security import router as security_router
 from app.api.ai_steering import router as ai_steering_router
 from app.api.assistant import router as assistant_router
+from app.api.issues import router as issues_router
 from app.config import settings
 
 app = FastAPI(
@@ -58,6 +59,7 @@ routers = [
     analysis_router,
     ai_steering_router,
     assistant_router,
+    issues_router,
 ]
 
 for r in routers:

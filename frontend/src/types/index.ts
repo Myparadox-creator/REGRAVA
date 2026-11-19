@@ -459,3 +459,64 @@ export interface AssistantProviderStatus {
   configured_provider?: string;
   status?: string;
 }
+
+export interface IssueEvidence {
+  type: string;
+  file_path?: string;
+  line_start?: number;
+  line_end?: number;
+  target?: string;
+  code_snippet?: string;
+  referenced_files?: string[];
+  existing_repository_files?: string[];
+  details?: string;
+  vulnerability_type?: string;
+}
+
+export interface IssueTriageRecord {
+  id: string;
+  repo_full_name: string;
+  issue_number: number;
+  issue_title: string;
+  issue_author: string;
+  issue_url?: string;
+  classification: 'ALREADY_IMPLEMENTED' | 'NON_EXISTENT_CONTEXT' | 'VALID_OPEN_ISSUE' | 'NEEDS_MORE_INFO';
+  confidence: string;
+  summary: string;
+  evidence: IssueEvidence[];
+  action_taken: 'CLOSED' | 'COMMENTED' | 'REOPENED' | 'NONE' | 'DRY_RUN';
+  github_comment_id?: string;
+  head_sha?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IssueItem {
+  number: number;
+  title: string;
+  body: string;
+  author: string;
+  author_avatar?: string;
+  state: 'open' | 'closed';
+  html_url: string;
+  created_at: string;
+  labels: { name: string; color: string }[];
+  triage?: IssueTriageRecord | null;
+}
+
+export interface IssueSentinelStats {
+  total_triaged: number;
+  already_implemented: number;
+  non_existent_context: number;
+  valid_open_issues: number;
+  auto_closed: number;
+  hours_saved: number;
+}
+
+export interface IssueSentinelSettings {
+  repo_full_name: string;
+  enabled: boolean;
+  auto_close: boolean;
+  mode: 'comment_and_close' | 'comment_only' | 'disabled';
+  updated_at?: string | null;
+}

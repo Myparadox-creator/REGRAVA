@@ -12,6 +12,7 @@ import {
   X,
   Menu,
   Sparkles,
+  CircleDot,
 } from 'lucide-react';
 import { GitHubAccount, UserProfile } from '../types';
 
@@ -41,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'security', label: 'Security Health', icon: ShieldCheck },
     { id: 'repos', label: 'Repositories', icon: FolderGit2 },
     { id: 'pulls', label: 'Pull Requests', icon: GitPullRequest },
+    { id: 'issues', label: 'Issue Sentinel', icon: CircleDot },
     {
       id: 'findings',
       label: 'Security Findings',

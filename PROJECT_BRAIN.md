@@ -492,7 +492,7 @@ The entire REGRAVA frontend is engineered to render cleanly on touchscreens and 
 
 ### Running Automated Test Suites
 
-* **Backend Unit & Integration Tests (76 cases across 14 test modules)**:
+* **Backend Unit & Integration Tests (86 cases across 15 test modules)**:
   ```bash
   cd backend
   $env:PYTHONPATH="."  # Windows PowerShell
@@ -524,3 +524,35 @@ REGRAVA is deployed on Vercel as a hybrid application:
 * **Minimal Scopes**: GitHub OAuth and Apps request read-only permissions (`contents: read`, `pull_requests: read`). Write access to code is never requested.
 * **Tamper-Evident Sessions**: All authentication tokens and state parameters use HMAC-SHA256 signatures with server-side secrets. Cookies are marked `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
 * **Audit Trail**: Every analyzed PR records a deterministic, timestamped audit log verifying compiler checks passed before merging.
+
+---
+
+## 13. Autonomous GitHub Issue Validator & Auto-Close Engine ("REGRAVA Issue Sentinel")
+
+### Overview & Problem Statement
+Open-source maintainers face relentless triage fatigue caused by:
+1. **Redundant Feature Requests**: Issues requesting routes, endpoints, or utility functions that already exist in the codebase.
+2. **Hallucinated & Foreign-Context Issues**: AI-generated spam or copy-pasted bug reports citing non-existent files, classes, or technology stacks (e.g. Java exceptions reported against Python microservices).
+3. **Unverified Bug Claims**: Inaccurate bug reports that consume developer hours investigating false alarms.
+
+**REGRAVA Issue Sentinel** is an autonomous verification and triage engine that grounds every GitHub issue against the repository's concrete Abstract Syntax Tree (AST) and file tree. When an issue is proven to be already implemented or referencing non-existent context, Sentinel posts an evidence-backed explanatory comment with line-level code proofs and automatically closes the issue.
+
+### Deterministic Grounding & Verification Workflow
+1. **Claim Extraction (`IssueVerifierService`)**:
+   * Scans issue title and body using regex tokenizers for file paths, route paths (`/api/...`), and identifiers.
+   * Classifies intent: `FEATURE_REQUEST`, `BUG_REPORT`, `SECURITY_REPORT`, `SUPPORT_QUESTION`.
+2. **AST & File Tree Verification**:
+   * **`ALREADY_IMPLEMENTED`**: Matches requested API endpoints (`@app.get(...)`, `@router.post(...)`) or symbols against active Python/TypeScript ASTs. Extracts file path, line numbers, and syntax-highlighted definition snippet. Eligible for auto-close.
+   * **`NON_EXISTENT_CONTEXT`**: Verifies whether cited files exist in the repository git tree (`main` branch). If all cited files are absent, flags as foreign/hallucinated spam. Eligible for auto-close (`not_planned`).
+   * **`VALID_OPEN_ISSUE`**: Confirms legitimate bugs or security vulnerabilities (e.g. CWE-22 path traversal in unvalidated file readers). Marks as verified, leaves issue open, and flags for priority maintainer attention.
+   * **`NEEDS_MORE_INFO`**: Flags underspecified issues lacking reproduction steps or context.
+3. **Dual-Token GitHub Dispatch (`IssueActionService`)**:
+   * Publishes formatted Markdown comment under the REGRAVA GitHub App identity or authorized maintainer OAuth token.
+   * Executes `PATCH /repos/{owner}/{repo}/issues/{issue_number}` with `{"state": "closed"}` when repository policy permits.
+   * Supports human maintainer override: commenting `@regrava reopen` reopens the issue and logs the override.
+4. **Data Persistence & Audit Log (`session_db.py`)**:
+   * `issue_triage` table records every triage decision, confidence score, evidence JSON, and action taken.
+   * `issue_sentinel_settings` table allows per-repository toggles (`auto_close`, `comment_only`, `disabled`).
+5. **Interactive UI (`IssuesPage.tsx`)**:
+   * Obsidian Black dashboard with real-time stats (Total Triaged, Already Implemented, Foreign Context, Verified Open, Hours Saved).
+   * Interactive "Triage with REGRAVA" trigger button, state filters, and collapsible Codebase Grounding evidence drawer.

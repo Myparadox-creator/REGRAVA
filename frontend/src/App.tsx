@@ -7,6 +7,7 @@ import { OverviewPage } from './pages/OverviewPage';
 import { SecurityDashboardPage } from './pages/SecurityDashboardPage';
 import { RepositoriesPage } from './pages/RepositoriesPage';
 import { PullRequestsPage } from './pages/PullRequestsPage';
+import { IssuesPage } from './pages/IssuesPage';
 import { FindingsPage } from './pages/FindingsPage';
 import { AIAssistantPage } from './pages/AIAssistantPage';
 import { AnalysisHistoryPage } from './pages/AnalysisHistoryPage';
@@ -49,11 +50,12 @@ import {
   updateFindingLifecycleStatus,
 } from './services/api';
 
-const VALID_TABS = ['overview', 'security', 'repos', 'pulls', 'findings', 'assistant', 'history', 'settings'];
+const VALID_TABS = ['overview', 'security', 'repos', 'pulls', 'issues', 'findings', 'assistant', 'history', 'settings'];
 
 function getTabFromHash(): string {
   const path = window.location.pathname.replace('/', '').trim().toLowerCase();
   if (path === 'assistant') return 'assistant';
+  if (path === 'issues') return 'issues';
   const hash = window.location.hash.replace('#', '').trim().toLowerCase();
   return VALID_TABS.includes(hash) ? hash : 'overview';
 }
@@ -580,6 +582,14 @@ export function App() {
               onToggleAutoReview={handleToggleAutoReview}
               onLoadPRReviews={loadPRReviewsFor}
               onUpdateLifecycleStatus={handleUpdateLifecycleStatus}
+            />
+          )}
+
+          {currentTab === 'issues' && (
+            <IssuesPage
+              repositories={repositories}
+              selectedRepo={selectedRepo}
+              onSelectRepo={handleSelectRepo}
             />
           )}
 

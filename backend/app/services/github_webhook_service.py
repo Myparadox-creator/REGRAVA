@@ -16,6 +16,7 @@ from fastapi import BackgroundTasks
 from app.config import settings
 from app.db.session_db import db
 from app.services.github_app_service import github_app_auth
+from app.services.issue_action_service import issue_action_service
 from app.services.regrava_review_service import regrava_review_service
 
 logger = logging.getLogger(__name__)
@@ -93,9 +94,18 @@ class GitHubWebhookService:
                 run_sync=run_sync,
             )
 
-        # 4. Issue Comment events (e.g. "@regrava review", "@regrava re-run", "/regrava review")
+        # 4. Issue Comment events (e.g. "@regrava review", "@regrava re-run", "/regrava review", "@regrava reopen")
         if event_type == "issue_comment":
             return await self._handle_issue_comment(
+                action=action,
+                payload=payload,
+                background_tasks=background_tasks,
+                run_sync=run_sync,
+            )
+
+        # 5. Issue Lifecycle events (e.g. issues opened or reopened -> Issue Sentinel Triage)
+        if event_type == "issues":
+            return await self._handle_issue_lifecycle(
                 action=action,
                 payload=payload,
                 background_tasks=background_tasks,
@@ -262,9 +272,6 @@ class GitHubWebhookService:
             return {"status": "ignored", "reason": f"Issue comment action '{action}' is not subscribed."}
 
         issue = payload.get("issue") or {}
-        if not issue.get("pull_request"):
-            return {"status": "ignored", "reason": "Comment is not on a pull request."}
-
         comment = payload.get("comment") or {}
         body = comment.get("body", "")
         author = (comment.get("user") or {}).get("login", "")
@@ -273,12 +280,45 @@ class GitHubWebhookService:
         if "[bot]" in author.lower() or author.lower() in ("regrava", "regrava-scanner"):
             return {"status": "ignored", "reason": "Comment was posted by a bot."}
 
+        repo_obj = payload.get("repository") or {}
+        repo_full_name = repo_obj.get("full_name")
+
+        # Case A: Comment on an issue (NOT a pull request)
+        if not issue.get("pull_request"):
+            issue_number = issue.get("number")
+            if not repo_full_name or not issue_number:
+                return {"status": "ignored", "reason": "Missing repository or issue number."}
+
+            if re.search(r"(@regrava|/regrava)\s+reopen\b", body, re.IGNORECASE):
+                await issue_action_service.reopen_issue(
+                    repo_full_name=repo_full_name,
+                    issue_number=int(issue_number),
+                    reopened_by=author,
+                )
+                return {
+                    "status": "issue_reopened",
+                    "repo_full_name": repo_full_name,
+                    "issue_number": issue_number,
+                    "reopened_by": author,
+                }
+            elif re.search(r"(@regrava|/regrava)\s+(?:triage|check|review)\b", body, re.IGNORECASE):
+                triage_res = await issue_action_service.execute_triage(
+                    repo_full_name=repo_full_name,
+                    issue_number=int(issue_number),
+                )
+                return {
+                    "status": "issue_triaged",
+                    "repo_full_name": repo_full_name,
+                    "issue_number": issue_number,
+                    "triage": triage_res,
+                }
+            return {"status": "ignored", "reason": "Comment on issue did not trigger sentinel triage or reopen."}
+
+        # Case B: Comment on a Pull Request (PR Review trigger)
         # Check for trigger phrase: @regrava, @regrava review, @regrava re-run, /regrava review
         if not re.search(r"(@regrava|/regrava)\b", body, re.IGNORECASE):
             return {"status": "ignored", "reason": "Comment does not mention @regrava."}
 
-        repo_obj = payload.get("repository") or {}
-        repo_full_name = repo_obj.get("full_name")
         pr_number = issue.get("number")
         if not repo_full_name or not pr_number:
             return {"status": "ignored", "reason": "Missing repository or PR number."}
@@ -324,6 +364,64 @@ class GitHubWebhookService:
             "trigger": "comment",
             "author": author,
         }
+
+    async def _handle_issue_lifecycle(
+        self,
+        action: str,
+        payload: Dict[str, Any],
+        background_tasks: Optional[BackgroundTasks],
+        run_sync: bool = False,
+    ) -> Dict[str, Any]:
+        """Automatically triage newly opened or reopened issues."""
+        if action not in ("opened", "reopened"):
+            return {"status": "ignored", "reason": f"Issue action '{action}' is not handled for triage."}
+
+        repo_obj = payload.get("repository") or {}
+        issue_obj = payload.get("issue") or {}
+        repo_full_name = repo_obj.get("full_name")
+        issue_number = issue_obj.get("number")
+
+        if not repo_full_name or not issue_number:
+            return {"status": "ignored", "reason": "Missing repository or issue number."}
+
+        # Check per-repository sentinel toggle
+        cfg = db.get_issue_sentinel_settings(repo_full_name)
+        if not cfg.get("enabled", True):
+            return {
+                "status": "skipped_sentinel_disabled",
+                "repo_full_name": repo_full_name,
+                "issue_number": issue_number,
+                "reason": "Issue Sentinel is disabled for this repository.",
+            }
+
+        user_id = db.get_user_id_for_repo(repo_full_name)
+
+        if run_sync or background_tasks is None:
+            triage_res = await issue_action_service.execute_triage(
+                repo_full_name=repo_full_name,
+                issue_number=int(issue_number),
+                user_id=user_id,
+            )
+            return {
+                "status": "issue_triaged",
+                "repo_full_name": repo_full_name,
+                "issue_number": issue_number,
+                "action": action,
+                "result": triage_res,
+            }
+        else:
+            background_tasks.add_task(
+                issue_action_service.execute_triage,
+                repo_full_name=repo_full_name,
+                issue_number=int(issue_number),
+                user_id=user_id,
+            )
+            return {
+                "status": "triage_scheduled",
+                "repo_full_name": repo_full_name,
+                "issue_number": issue_number,
+                "action": action,
+            }
 
 
 github_webhook_service = GitHubWebhookService()

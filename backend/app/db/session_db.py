@@ -236,6 +236,32 @@ class DatabaseManager:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS issue_triage (
+                id TEXT PRIMARY KEY,
+                repo_full_name TEXT NOT NULL,
+                issue_number INTEGER NOT NULL,
+                issue_title TEXT NOT NULL,
+                issue_author TEXT NOT NULL,
+                issue_url TEXT,
+                classification TEXT NOT NULL,
+                confidence TEXT NOT NULL DEFAULT 'HIGH',
+                summary TEXT NOT NULL,
+                evidence_json TEXT NOT NULL DEFAULT '[]',
+                action_taken TEXT NOT NULL DEFAULT 'NONE',
+                github_comment_id TEXT,
+                head_sha TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS issue_sentinel_settings (
+                repo_full_name TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                auto_close INTEGER NOT NULL DEFAULT 1,
+                mode TEXT NOT NULL DEFAULT 'comment_and_close',
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
             CREATE INDEX IF NOT EXISTS idx_analyses_user ON pr_analyses(user_id);
             CREATE INDEX IF NOT EXISTS idx_analyses_repo ON pr_analyses(repo_name);
@@ -245,6 +271,7 @@ class DatabaseManager:
             CREATE INDEX IF NOT EXISTS idx_lifecycle_fp ON finding_lifecycle(repo_full_name, pr_number, fingerprint);
             CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
             CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
+            CREATE INDEX IF NOT EXISTS idx_issue_triage_repo ON issue_triage(repo_full_name, issue_number);
         """
         try:
             with self._get_connection() as conn:
@@ -1225,6 +1252,195 @@ class DatabaseManager:
                 (conversation_id, target_created),
             )
             return True
+
+    # --- Issue Sentinel Triage Management ---
+    def record_issue_triage(
+        self,
+        repo_full_name: str,
+        issue_number: int,
+        issue_title: str,
+        issue_author: str,
+        classification: str,
+        confidence: str,
+        summary: str,
+        evidence: List[Any],
+        action_taken: str = "NONE",
+        issue_url: Optional[str] = None,
+        github_comment_id: Optional[str] = None,
+        head_sha: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Insert or update triage analysis for an issue."""
+        now = datetime.now(timezone.utc).isoformat()
+        rec_id = str(uuid.uuid4())
+        evidence_json = json.dumps(evidence or [])
+
+        with self._get_connection() as conn:
+            # Check existing
+            existing = conn.execute(
+                "SELECT id FROM issue_triage WHERE LOWER(repo_full_name) = LOWER(?) AND issue_number = ?",
+                (repo_full_name, issue_number),
+            ).fetchone()
+
+            if existing:
+                rec_id = existing["id"]
+                conn.execute(
+                    "UPDATE issue_triage SET issue_title = ?, issue_author = ?, issue_url = COALESCE(?, issue_url), "
+                    "classification = ?, confidence = ?, summary = ?, evidence_json = ?, action_taken = ?, "
+                    "github_comment_id = COALESCE(?, github_comment_id), head_sha = COALESCE(?, head_sha), updated_at = ? "
+                    "WHERE id = ?",
+                    (
+                        issue_title,
+                        issue_author,
+                        issue_url,
+                        classification,
+                        confidence,
+                        summary,
+                        evidence_json,
+                        action_taken,
+                        github_comment_id,
+                        head_sha,
+                        now,
+                        rec_id,
+                    ),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO issue_triage (id, repo_full_name, issue_number, issue_title, issue_author, issue_url, "
+                    "classification, confidence, summary, evidence_json, action_taken, github_comment_id, head_sha, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        rec_id,
+                        repo_full_name,
+                        issue_number,
+                        issue_title,
+                        issue_author,
+                        issue_url,
+                        classification,
+                        confidence,
+                        summary,
+                        evidence_json,
+                        action_taken,
+                        github_comment_id,
+                        head_sha,
+                        now,
+                        now,
+                    ),
+                )
+
+        return self.get_issue_triage(repo_full_name, issue_number) or {}
+
+    def get_issue_triage(self, repo_full_name: str, issue_number: int) -> Optional[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM issue_triage WHERE LOWER(repo_full_name) = LOWER(?) AND issue_number = ?",
+                (repo_full_name, issue_number),
+            ).fetchone()
+            if not row:
+                return None
+            d = dict(row)
+            try:
+                d["evidence"] = json.loads(d.get("evidence_json") or "[]")
+            except Exception:
+                d["evidence"] = []
+            return d
+
+    def list_issue_triage(self, repo_full_name: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            if repo_full_name:
+                rows = conn.execute(
+                    "SELECT * FROM issue_triage WHERE LOWER(repo_full_name) = LOWER(?) ORDER BY updated_at DESC LIMIT ?",
+                    (repo_full_name, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM issue_triage ORDER BY updated_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+
+            res = []
+            for r in rows:
+                d = dict(r)
+                try:
+                    d["evidence"] = json.loads(d.get("evidence_json") or "[]")
+                except Exception:
+                    d["evidence"] = []
+                res.append(d)
+            return res
+
+    def get_issue_triage_stats(self, repo_full_name: Optional[str] = None) -> Dict[str, Any]:
+        with self._get_connection() as conn:
+            filter_sql = "WHERE LOWER(repo_full_name) = LOWER(?)" if repo_full_name else ""
+            params = (repo_full_name,) if repo_full_name else ()
+
+            total = conn.execute(f"SELECT COUNT(*) as cnt FROM issue_triage {filter_sql}", params).fetchone()["cnt"]
+            already_impl = conn.execute(
+                f"SELECT COUNT(*) as cnt FROM issue_triage {filter_sql} {'AND' if filter_sql else 'WHERE'} classification = 'ALREADY_IMPLEMENTED'",
+                params,
+            ).fetchone()["cnt"]
+            invalid = conn.execute(
+                f"SELECT COUNT(*) as cnt FROM issue_triage {filter_sql} {'AND' if filter_sql else 'WHERE'} classification = 'NON_EXISTENT_CONTEXT'",
+                params,
+            ).fetchone()["cnt"]
+            valid = conn.execute(
+                f"SELECT COUNT(*) as cnt FROM issue_triage {filter_sql} {'AND' if filter_sql else 'WHERE'} classification = 'VALID_OPEN_ISSUE'",
+                params,
+            ).fetchone()["cnt"]
+            closed = conn.execute(
+                f"SELECT COUNT(*) as cnt FROM issue_triage {filter_sql} {'AND' if filter_sql else 'WHERE'} action_taken = 'CLOSED'",
+                params,
+            ).fetchone()["cnt"]
+
+            # Estimate: 0.75 maintainer hours saved per closed spam/redundant issue
+            hours_saved = round(closed * 0.75, 1)
+
+            return {
+                "total_triaged": total,
+                "already_implemented": already_impl,
+                "non_existent_context": invalid,
+                "valid_open_issues": valid,
+                "auto_closed": closed,
+                "hours_saved": hours_saved,
+            }
+
+    def get_issue_sentinel_settings(self, repo_full_name: str) -> Dict[str, Any]:
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM issue_sentinel_settings WHERE LOWER(repo_full_name) = LOWER(?)",
+                (repo_full_name,),
+            ).fetchone()
+            if not row:
+                return {
+                    "repo_full_name": repo_full_name,
+                    "enabled": True,
+                    "auto_close": True,
+                    "mode": "comment_and_close",
+                    "updated_at": None,
+                }
+            d = dict(row)
+            d["enabled"] = bool(d.get("enabled", 1))
+            d["auto_close"] = bool(d.get("auto_close", 1))
+            return d
+
+    def upsert_issue_sentinel_settings(
+        self,
+        repo_full_name: str,
+        enabled: bool = True,
+        auto_close: bool = True,
+        mode: str = "comment_and_close",
+    ) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO issue_sentinel_settings (repo_full_name, enabled, auto_close, mode, updated_at) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(repo_full_name) DO UPDATE SET "
+                "enabled = excluded.enabled, "
+                "auto_close = excluded.auto_close, "
+                "mode = excluded.mode, "
+                "updated_at = excluded.updated_at",
+                (repo_full_name, 1 if enabled else 0, 1 if auto_close else 0, mode, now),
+            )
+        return self.get_issue_sentinel_settings(repo_full_name)
 
 
 db = DatabaseManager()

@@ -220,6 +220,55 @@ async def proxy_avatar(user_id: int, avatar_url: str):
     ],
 }
 
+DEMO_ISSUES: Dict[str, List[Dict[str, Any]]] = {
+    "demo-org/payment-service": [
+        {
+            "number": 101,
+            "title": "feat: Add endpoint to download payment receipts",
+            "body": "It would be great to have an endpoint like `/api/receipts/download` or `download_receipt` handler that reads receipts and returns them to the caller.",
+            "author": "open-contributor-42",
+            "author_avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
+            "state": "open",
+            "html_url": "https://github.com/demo-org/payment-service/issues/101",
+            "created_at": "2026-11-18T14:20:00Z",
+            "labels": [{"name": "enhancement", "color": "a2eeef"}],
+        },
+        {
+            "number": 102,
+            "title": "bug: NullPointerException in PaymentsLegacyHelper.java line 85",
+            "body": "Running customer billing throws a NullPointerException in `src/main/java/com/payments/PaymentsLegacyHelper.java` at line 85 when context is missing.",
+            "author": "spam-bot-bot",
+            "author_avatar": "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80",
+            "state": "open",
+            "html_url": "https://github.com/demo-org/payment-service/issues/102",
+            "created_at": "2026-11-18T16:45:00Z",
+            "labels": [{"name": "bug", "color": "d73a4a"}],
+        },
+        {
+            "number": 103,
+            "title": "security: Path traversal in /api/receipts/download allows arbitrary file read",
+            "body": "In `backend/routes/payment.py`, the `download_receipt` function opens `f'/var/receipts/{filename}'` without `os.path.basename` validation, exposing sensitive host files like `/etc/passwd` via `../../` directory traversal.",
+            "author": "security-researcher-pro",
+            "author_avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80",
+            "state": "open",
+            "html_url": "https://github.com/demo-org/payment-service/issues/103",
+            "created_at": "2026-11-18T18:10:00Z",
+            "labels": [{"name": "security", "color": "b60205"}],
+        },
+        {
+            "number": 104,
+            "title": "question: How to configure local stripe secret key",
+            "body": "Could someone explain where to place STRIPE_SECRET_KEY in the environment file?",
+            "author": "newbie-coder",
+            "author_avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+            "state": "open",
+            "html_url": "https://github.com/demo-org/payment-service/issues/104",
+            "created_at": "2026-11-18T19:00:00Z",
+            "labels": [{"name": "question", "color": "cc317c"}],
+        },
+    ]
+}
+
 
 class GitHubService:
     def __init__(self):
@@ -268,6 +317,94 @@ class GitHubService:
             pass
 
         return DEMO_REPOSITORIES
+
+    async def list_issues(self, user_id: str, repo_full_name: str, state: str = "open") -> List[Dict[str, Any]]:
+        """Fetch issues for a repository (excluding pull requests)."""
+        if not db.check_repo_access(user_id, repo_full_name):
+            if not any(r["full_name"] == repo_full_name for r in DEMO_REPOSITORIES):
+                raise PermissionError(f"Access denied: You are not authorized to access '{repo_full_name}'.")
+
+        # Check demo issues
+        if repo_full_name in DEMO_ISSUES:
+            issues = DEMO_ISSUES[repo_full_name]
+            if state != "all":
+                return [i for i in issues if i.get("state") == state]
+            return issues
+
+        # Real GitHub API
+        account = db.get_github_account(user_id)
+        access_token = (account.get("access_token") if account else None) or settings.GITHUB_TOKEN
+        if access_token:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.get(
+                        f"https://api.github.com/repos/{repo_full_name}/issues?state={state}&per_page=50",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Accept": "application/vnd.github.v3+json",
+                        },
+                    )
+                    if res.status_code == 200:
+                        issue_list = []
+                        for item in res.json():
+                            # Exclude pull requests which GitHub includes in issues endpoint
+                            if "pull_request" in item:
+                                continue
+                            issue_list.append({
+                                "number": item["number"],
+                                "title": item["title"],
+                                "body": item.get("body") or "",
+                                "author": (item.get("user") or {}).get("login", "unknown"),
+                                "author_avatar": (item.get("user") or {}).get("avatar_url", ""),
+                                "state": item.get("state", "open"),
+                                "html_url": item.get("html_url", f"https://github.com/{repo_full_name}/issues/{item['number']}"),
+                                "created_at": item.get("created_at", ""),
+                                "labels": [{"name": l.get("name"), "color": l.get("color")} for l in item.get("labels", [])],
+                            })
+                        return issue_list
+            except Exception:
+                pass
+
+        return []
+
+    async def get_issue(self, user_id: str, repo_full_name: str, issue_number: int) -> Dict[str, Any]:
+        """Fetch a specific issue by number."""
+        if not db.check_repo_access(user_id, repo_full_name):
+            if not any(r["full_name"] == repo_full_name for r in DEMO_REPOSITORIES):
+                raise PermissionError(f"Access denied: You are not authorized to inspect '{repo_full_name}'.")
+
+        if repo_full_name in DEMO_ISSUES:
+            for item in DEMO_ISSUES[repo_full_name]:
+                if item["number"] == issue_number:
+                    return item
+
+        # Real GitHub API
+        account = db.get_github_account(user_id)
+        access_token = (account.get("access_token") if account else None) or settings.GITHUB_TOKEN
+        if access_token:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.get(
+                    f"https://api.github.com/repos/{repo_full_name}/issues/{issue_number}",
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Accept": "application/vnd.github.v3+json",
+                    },
+                )
+                if res.status_code == 200:
+                    item = res.json()
+                    return {
+                        "number": item["number"],
+                        "title": item["title"],
+                        "body": item.get("body") or "",
+                        "author": (item.get("user") or {}).get("login", "unknown"),
+                        "author_avatar": (item.get("user") or {}).get("avatar_url", ""),
+                        "state": item.get("state", "open"),
+                        "html_url": item.get("html_url", f"https://github.com/{repo_full_name}/issues/{issue_number}"),
+                        "created_at": item.get("created_at", ""),
+                        "labels": [{"name": l.get("name"), "color": l.get("color")} for l in item.get("labels", [])],
+                    }
+
+        raise FileNotFoundError(f"Issue #{issue_number} not found in {repo_full_name}.")
 
     async def list_pull_requests(self, user_id: str, repo_full_name: str) -> List[Dict[str, Any]]:
         """Fetch open pull requests for a repository."""
