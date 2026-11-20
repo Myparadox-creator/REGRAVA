@@ -6,6 +6,7 @@ OpenAI, and Anthropic with automatic credential resolution and safe error handli
 
 import json
 import logging
+import time
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Dict, List, Optional, Any
 import httpx
@@ -67,6 +68,7 @@ class GeminiLLMProvider(BaseLLMProvider):
     """
 
     DEFAULT_MODEL = "gemini-1.5-flash"
+    _models_cache: Dict[str, Any] = {}
 
     def get_api_key(self) -> Optional[str]:
         return settings.get_gemini_api_key()
@@ -81,6 +83,38 @@ class GeminiLLMProvider(BaseLLMProvider):
         if "gemini" in configured.lower():
             return configured
         return self.DEFAULT_MODEL
+
+    async def _discover_available_models(self, key: str) -> List[str]:
+        """Query Google's ListModels API to get the exact models active for this key."""
+        now = time.time()
+        cached = self._models_cache.get(key)
+        if cached and (now - cached["timestamp"] < 300):
+            return cached["models"]
+
+        discovered: List[str] = []
+        for api_ver in ("v1beta", "v1"):
+            url = f"https://generativelanguage.googleapis.com/{api_ver}/models?key={key}"
+            try:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    res = await client.get(url)
+                    if res.status_code == 200:
+                        data = res.json()
+                        for m in data.get("models", []):
+                            methods = m.get("supportedGenerationMethods", [])
+                            if "generateContent" in methods:
+                                name = m.get("name", "")
+                                if name.startswith("models/"):
+                                    name = name[7:]
+                                if name and name not in discovered:
+                                    discovered.append(name)
+                        if discovered:
+                            break
+            except Exception as e:
+                logger.warning("Failed to query ListModels on %s: %s", api_ver, e)
+
+        if discovered:
+            self._models_cache[key] = {"timestamp": now, "models": discovered}
+        return discovered
 
     def validate_provider(self) -> Dict[str, Any]:
         key = self.get_api_key()
@@ -131,10 +165,37 @@ class GeminiLLMProvider(BaseLLMProvider):
         if any(bad in active_model.lower() for bad in ("2.5", "2.0")):
             active_model = self.DEFAULT_MODEL
 
-        # Verified stable production Google Gemini models
-        candidate_models = ["gemini-1.5-flash", "gemini-1.5-pro"]
-        if active_model not in candidate_models:
-            candidate_models.insert(0, active_model)
+        # Dynamically discover which exact models are provisioned for this key
+        discovered = await self._discover_available_models(key)
+
+        candidate_models = []
+        if active_model and discovered and active_model in discovered:
+            candidate_models.append(active_model)
+        elif active_model:
+            candidate_models.append(active_model)
+
+        if discovered:
+            flash_models = [m for m in discovered if "flash" in m.lower() and m not in candidate_models]
+            pro_models = [m for m in discovered if "pro" in m.lower() and m not in candidate_models and m not in flash_models]
+            other_models = [m for m in discovered if m not in candidate_models and m not in flash_models and m not in pro_models]
+            candidate_models.extend(flash_models)
+            candidate_models.extend(pro_models)
+            candidate_models.extend(other_models)
+        else:
+            static_fallbacks = [
+                "gemini-1.5-flash",
+                "gemini-1.5-flash-latest",
+                "gemini-1.5-flash-001",
+                "gemini-1.5-flash-002",
+                "gemini-1.5-pro",
+                "gemini-1.5-pro-latest",
+                "gemini-2.0-flash-exp",
+                "gemini-2.0-flash",
+                "gemini-pro",
+            ]
+            for fb in static_fallbacks:
+                if fb not in candidate_models:
+                    candidate_models.append(fb)
 
         payload: Dict[str, Any] = {
             "contents": self._convert_messages(messages),
@@ -151,48 +212,71 @@ class GeminiLLMProvider(BaseLLMProvider):
         last_err = ""
         success = False
 
+        # Try models across both v1beta and v1 endpoints
         for current_model in candidate_models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:streamGenerateContent?alt=sse&key={key}"
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                try:
-                    async with client.stream("POST", url, json=payload, headers={"Content-Type": "application/json"}) as response:
-                        if response.status_code == 404:
-                            err_body = await response.aread()
-                            err_text = err_body.decode(errors="replace")
-                            logger.warning(f"Gemini model '{current_model}' returned 404: {err_text}. Trying next fallback...")
-                            last_err = err_text
-                            continue
-                        elif response.status_code != 200:
-                            err_body = await response.aread()
-                            err_text = err_body.decode(errors="replace")
-                            logger.error(f"Gemini API error ({response.status_code}): {err_text}")
-                            raise LLMProviderUnavailableError(
-                                f"Gemini API error ({response.status_code}): {err_text[:200]}"
-                            )
+            for api_ver in ("v1beta", "v1"):
+                url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{current_model}:streamGenerateContent?alt=sse&key={key}"
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    try:
+                        async with client.stream("POST", url, json=payload, headers={"Content-Type": "application/json"}) as response:
+                            if response.status_code == 404:
+                                err_body = await response.aread()
+                                err_text = err_body.decode(errors="replace")
+                                logger.warning(f"Gemini model '{current_model}' on {api_ver} returned 404: {err_text}")
+                                last_err = err_text
+                                continue
+                            elif response.status_code != 200:
+                                err_body = await response.aread()
+                                err_text = err_body.decode(errors="replace")
+                                logger.error(f"Gemini API error ({response.status_code}): {err_text}")
+                                raise LLMProviderUnavailableError(
+                                    f"Gemini API error ({response.status_code}): {err_text[:200]}"
+                                )
 
-                        success = True
-                        async for line in response.aiter_lines():
-                            if not line or not line.startswith("data: "):
-                                continue
-                            data_str = line[6:].strip()
-                            if not data_str or data_str == "[DONE]":
-                                continue
-                            try:
-                                parsed = json.loads(data_str)
-                                candidates = parsed.get("candidates", [])
+                            success = True
+                            async for line in response.aiter_lines():
+                                if not line or not line.startswith("data: "):
+                                    continue
+                                data_str = line[6:].strip()
+                                if not data_str or data_str == "[DONE]":
+                                    continue
+                                try:
+                                    parsed = json.loads(data_str)
+                                    candidates = parsed.get("candidates", [])
+                                    if candidates:
+                                        parts = candidates[0].get("content", {}).get("parts", [])
+                                        for p in parts:
+                                            txt = p.get("text", "")
+                                            if txt:
+                                                yield txt
+                                except json.JSONDecodeError:
+                                    continue
+                            return  # Successfully completed stream
+                    except httpx.TimeoutException:
+                        raise LLMProviderUnavailableError("Gemini request timed out.")
+                    except httpx.RequestError as e:
+                        logger.warning(f"Network error on {url}: {e}")
+                        continue
+
+        # Fallback to non-streaming generateContent if stream endpoint was 404
+        if not success:
+            for current_model in candidate_models[:4]:
+                for api_ver in ("v1beta", "v1"):
+                    url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{current_model}:generateContent?key={key}"
+                    try:
+                        async with httpx.AsyncClient(timeout=30.0) as client:
+                            res = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
+                            if res.status_code == 200:
+                                data = res.json()
+                                candidates = data.get("candidates", [])
                                 if candidates:
                                     parts = candidates[0].get("content", {}).get("parts", [])
-                                    for p in parts:
-                                        txt = p.get("text", "")
-                                        if txt:
-                                            yield txt
-                            except json.JSONDecodeError:
-                                continue
-                        return  # Successfully completed stream
-                except httpx.TimeoutException:
-                    raise LLMProviderUnavailableError("Gemini request timed out.")
-                except httpx.RequestError as e:
-                    raise LLMProviderUnavailableError(f"Network error connecting to Gemini API: {str(e)}")
+                                    txt = "".join(p.get("text", "") for p in parts)
+                                    if txt:
+                                        yield txt
+                                        return
+                    except Exception:
+                        pass
 
         if not success:
             raise LLMProviderUnavailableError(f"Gemini model error (404): {last_err[:200]}")
