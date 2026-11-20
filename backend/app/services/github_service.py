@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Any
 import httpx
 from app.config import settings
 from app.db.session_db import db
+from app.services.github_app_service import github_app_auth
 
 
 DEMO_REPOSITORIES = [
@@ -278,43 +279,91 @@ class GitHubService:
     async def list_authorized_repositories(self, user_id: str) -> List[Dict[str, Any]]:
         """
         List repositories that the user has explicitly authorized REGRAVA to access.
-        Uses real GitHub API when user has a connected live GitHub account,
-        or demo repository list for demo users and unconfigured environments.
+        Prioritizes:
+        1. Live GitHub App installations (fetching real repos via installation token)
+        2. Real GitHub API via user OAuth access token
+        3. Stored authorized_repos list from session/account (synthesized repository cards)
+        4. Fallback to DEMO_REPOSITORIES only if user is demo or has 0 authorized repos.
         """
-        account = db.get_github_account(user_id)
-        access_token = (account.get("access_token") if account else None) or settings.GITHUB_TOKEN
-        if not access_token:
-            return DEMO_REPOSITORIES
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                res = await client.get(
-                    "https://api.github.com/user/repos?per_page=100&sort=updated",
-                    headers={
-                        "Authorization": f"Bearer {access_token}",
-                        "Accept": "application/vnd.github.v3+json",
-                    },
-                )
-                if res.status_code == 200:
-                    repos_data = res.json()
-                    authorized_names = set(account.get("authorized_repos", []))
-                    matched_repos = []
-                    for r in repos_data:
-                        full_name = r.get("full_name", "")
-                        if not authorized_names or full_name in authorized_names or bool(access_token):
-                            matched_repos.append({
-                                "id": str(r["id"]),
-                                "name": r["name"],
-                                "full_name": full_name,
-                                "owner": r["owner"]["login"],
-                                "description": r.get("description") or "No description provided",
-                                "is_private": r.get("private", False),
-                                "default_branch": r.get("default_branch", "main"),
-                                "open_pull_requests_count": r.get("open_issues_count", 0),
-                                "updated_at": r.get("updated_at", ""),
-                            })
-                    return matched_repos if matched_repos else DEMO_REPOSITORIES
-        except Exception:
-            pass
+        user = db.get_user_by_id(user_id) if user_id else None
+        is_demo_user = bool(user and user.get("is_demo"))
+
+        account = db.get_github_account(user_id) if user_id else None
+        authorized_names = list(account.get("authorized_repos", [])) if account else []
+
+        # 1. Try GitHub App installation
+        if account:
+            inst_id = account.get("installation_id")
+            if not inst_id or inst_id in ("token-restored", "oauth-app", "pat-token"):
+                username = account.get("github_username") or ""
+                found_inst = db.find_installation_for_account(username)
+                if found_inst:
+                    inst_id = found_inst.get("installation_id")
+
+            if inst_id and inst_id not in ("token-restored", "oauth-app", "pat-token"):
+                try:
+                    app_repos = await github_app_auth.get_installation_repositories(inst_id)
+                    if app_repos:
+                        db.update_authorized_repos(user_id, [r["full_name"] for r in app_repos])
+                        return app_repos
+                except Exception:
+                    pass
+
+        # 2. Try User OAuth access token or global GITHUB_TOKEN
+        access_token = (account.get("access_token") if account else None) or (None if is_demo_user else settings.GITHUB_TOKEN)
+        if access_token:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.get(
+                        "https://api.github.com/user/repos?per_page=100&sort=updated",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "Accept": "application/vnd.github.v3+json",
+                        },
+                    )
+                    if res.status_code == 200:
+                        repos_data = res.json()
+                        matched_repos = []
+                        auth_set = set(authorized_names)
+                        for r in repos_data:
+                            full_name = r.get("full_name", "")
+                            if not auth_set or full_name in auth_set or bool(account):
+                                matched_repos.append({
+                                    "id": str(r["id"]),
+                                    "name": r["name"],
+                                    "full_name": full_name,
+                                    "owner": (r.get("owner") or {}).get("login", ""),
+                                    "description": r.get("description") or "No description provided",
+                                    "is_private": bool(r.get("private", False)),
+                                    "default_branch": r.get("default_branch", "main"),
+                                    "open_pull_requests_count": r.get("open_issues_count", 0),
+                                    "updated_at": r.get("updated_at", ""),
+                                })
+                        if matched_repos:
+                            return matched_repos
+            except Exception:
+                pass
+
+        # 3. Fallback to authorized_repos list if present (e.g. token expired, rate limit, or serverless cold restart)
+        if authorized_names and not is_demo_user:
+            synthesized = []
+            for fn in authorized_names:
+                if "/" in fn:
+                    owner, name = fn.split("/", 1)
+                else:
+                    owner, name = "unknown", fn
+                synthesized.append({
+                    "id": f"auth-{fn.replace('/', '-')}",
+                    "name": name,
+                    "full_name": fn,
+                    "owner": owner,
+                    "description": "Authorized via REGRAVA GitHub App",
+                    "is_private": False,
+                    "default_branch": "main",
+                    "open_pull_requests_count": 0,
+                    "updated_at": "",
+                })
+            return synthesized
 
         return DEMO_REPOSITORIES
 

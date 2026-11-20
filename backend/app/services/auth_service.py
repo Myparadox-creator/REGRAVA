@@ -45,6 +45,7 @@ class AuthService:
                 "u": github_account.get("github_username"),
                 "tok": github_account.get("access_token"),
                 "repos": github_account.get("authorized_repos", []),
+                "inst": github_account.get("installation_id"),
             }
 
         payload = {
@@ -356,6 +357,7 @@ class AuthService:
                 "github_username": gh_username,
                 "authorized_repos": authorized_repos,
                 "access_token": access_token,
+                "installation_id": installation_id or "oauth-app",
             }
             session_token = self.generate_session_token(user=user, github_account=gh_account)
             db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
@@ -425,7 +427,6 @@ class AuthService:
             if repo_res.status_code == 200:
                 authorized_repos = [r["full_name"] for r in repo_res.json() if "full_name" in r]
 
-            session_token = None
             if not user_id:
                 user = db.upsert_user(
                     email=email,
@@ -435,10 +436,17 @@ class AuthService:
                     is_demo=False,
                 )
                 user_id = user["id"]
-                session_token = self.generate_session_token()
-                db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
             else:
                 user = db.get_user_by_id(user_id)
+                if not user:
+                    user = db.upsert_user(
+                        email=email,
+                        name=user_data.get("name") or gh_username,
+                        auth_provider="github",
+                        avatar_url=gh_avatar,
+                        is_demo=False,
+                        user_id=user_id,
+                    )
 
             db.save_github_account(
                 user_id=user_id,
@@ -448,6 +456,15 @@ class AuthService:
                 authorized_repos=authorized_repos,
                 access_token=clean_token,
             )
+
+            gh_account = {
+                "github_username": gh_username,
+                "authorized_repos": authorized_repos,
+                "access_token": clean_token,
+                "installation_id": "pat-token",
+            }
+            session_token = self.generate_session_token(user=user, github_account=gh_account)
+            db.create_session(user_id, session_token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
 
             return {
                 "github_username": gh_username,
@@ -537,16 +554,25 @@ def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]]:
                 auth_provider=auth_provider,
                 avatar_url=avatar,
                 is_demo=is_demo,
+                user_id=user_id,
             )
-            db.create_session(user_id, token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
+            actual_user_id = user["id"]
+            db.create_session(actual_user_id, token, duration_seconds=settings.SESSION_MAX_AGE_SECONDS)
 
             gh = payload.get("gh")
-            if gh and (gh.get("u") or gh.get("tok")):
+            if gh and (gh.get("u") or gh.get("tok") or gh.get("repos") or gh.get("inst")):
+                inst_id = gh.get("inst")
+                if not inst_id or inst_id == "token-restored":
+                    found_inst = db.find_installation_for_account(gh.get("u") or "")
+                    if found_inst:
+                        inst_id = found_inst.get("installation_id")
+                    else:
+                        inst_id = "token-restored"
                 db.save_github_account(
-                    user_id=user_id,
+                    user_id=actual_user_id,
                     github_user_id=None,
                     github_username=gh.get("u"),
-                    installation_id="token-restored",
+                    installation_id=inst_id,
                     authorized_repos=gh.get("repos", []),
                     access_token=gh.get("tok"),
                 )

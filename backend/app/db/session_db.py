@@ -299,6 +299,7 @@ class DatabaseManager:
         auth_provider: str,
         avatar_url: Optional[str] = None,
         is_demo: bool = False,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         existing = self.get_user_by_email(email)
         now = datetime.now(timezone.utc).isoformat()
@@ -313,14 +314,14 @@ class DatabaseManager:
                     existing["avatar_url"] = avatar_url
                 return existing
             else:
-                user_id = str(uuid.uuid4())
+                uid = user_id or str(uuid.uuid4())
                 conn.execute(
                     "INSERT INTO users (id, email, name, avatar_url, auth_provider, is_demo, created_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (user_id, email, name, avatar_url, auth_provider, 1 if is_demo else 0, now),
+                    (uid, email, name, avatar_url, auth_provider, 1 if is_demo else 0, now),
                 )
                 return {
-                    "id": user_id,
+                    "id": uid,
                     "email": email,
                     "name": name,
                     "avatar_url": avatar_url,
@@ -380,9 +381,22 @@ class DatabaseManager:
         with self._get_connection() as conn:
             row = conn.execute("SELECT * FROM github_accounts WHERE user_id = ?", (user_id,)).fetchone()
             if not row:
+                user = self.get_user_by_id(user_id)
+                if user and user.get("email"):
+                    other_user = conn.execute(
+                        "SELECT u.id FROM users u JOIN github_accounts ga ON u.id = ga.user_id "
+                        "WHERE LOWER(u.email) = LOWER(?) AND u.id != ? LIMIT 1",
+                        (user["email"], user_id),
+                    ).fetchone()
+                    if other_user:
+                        row = conn.execute("SELECT * FROM github_accounts WHERE user_id = ?", (other_user["id"],)).fetchone()
+            if not row:
                 return None
             data = dict(row)
-            data["authorized_repos"] = json.loads(data["authorized_repos"])
+            try:
+                data["authorized_repos"] = json.loads(data["authorized_repos"])
+            except Exception:
+                data["authorized_repos"] = []
             return data
 
     def save_github_account(
@@ -415,6 +429,17 @@ class DatabaseManager:
     def revoke_github_account(self, user_id: str) -> None:
         with self._get_connection() as conn:
             conn.execute("DELETE FROM github_accounts WHERE user_id = ?", (user_id,))
+
+    def update_authorized_repos(self, user_id: str, repos: List[str]) -> None:
+        if not user_id or not repos:
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        repos_json = json.dumps(repos)
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE github_accounts SET authorized_repos = ?, updated_at = ? WHERE user_id = ?",
+                (repos_json, now, user_id),
+            )
 
     def check_repo_access(self, user_id: str, repo_name: str) -> bool:
         """Verify whether a user is authorized to access a given repository."""
@@ -681,6 +706,22 @@ class DatabaseManager:
                     data["repositories"] = repos
                     data["suspended"] = bool(data.get("suspended", 0))
                     return data
+        return None
+
+    def find_installation_for_account(self, account_login: str) -> Optional[Dict[str, Any]]:
+        if not account_login:
+            return None
+        target = account_login.lower().strip()
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM github_installations WHERE LOWER(account_login) = ? AND suspended = 0 ORDER BY updated_at DESC LIMIT 1",
+                (target,),
+            ).fetchone()
+            if row:
+                data = dict(row)
+                data["repositories"] = json.loads(data.get("repositories_json") or "[]")
+                data["suspended"] = bool(data.get("suspended", 0))
+                return data
         return None
 
     def update_installation_repos(

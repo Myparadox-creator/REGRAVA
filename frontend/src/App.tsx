@@ -140,7 +140,7 @@ export function App() {
         setIsAuthenticated(true);
         setUser(data.user);
         setGithubAccount(data.github_account);
-        loadInitialData();
+        loadInitialData(data.github_account);
       } else {
         setIsAuthenticated(false);
       }
@@ -161,10 +161,35 @@ export function App() {
     }
   };
 
-  const loadInitialData = async () => {
+  const loadInitialData = async (activeAccount?: GitHubAccount | null) => {
     try {
       fetchGitHubAppStatus().then(setGithubAppStatus).catch(() => {});
-      const repos = await fetchAuthorizedRepositories();
+      let repos = await fetchAuthorizedRepositories();
+
+      const account = activeAccount !== undefined ? activeAccount : githubAccount;
+      if (account?.authorized_repos && account.authorized_repos.length > 0) {
+        const isDemoSet = repos.length === 0 || repos.every((r) => r.full_name.startsWith('demo-org/'));
+        if (isDemoSet) {
+          // Ensure authorized repositories are displayed when live token expired or serverless refreshed
+          repos = account.authorized_repos.map((fn: string) => {
+            const parts = fn.split('/');
+            const owner = parts[0] || 'unknown';
+            const name = parts[1] || fn;
+            return {
+              id: `auth-${fn.replace('/', '-')}`,
+              name,
+              full_name: fn,
+              owner,
+              description: 'Authorized repository via REGRAVA GitHub App',
+              is_private: false,
+              default_branch: 'main',
+              open_pull_requests_count: 0,
+              updated_at: '',
+            };
+          });
+        }
+      }
+
       setRepositories(repos);
       if (repos.length > 0) {
         const primaryRepo = repos[0];

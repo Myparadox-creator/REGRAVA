@@ -253,6 +253,66 @@ class GitHubAppAuthService:
             logger.warning("Installation repo verification failed for %s: %s", repo_full_name, type(exc).__name__)
         return False
 
+    async def get_installation_repositories(
+        self, installation_id: str, client: Optional[httpx.AsyncClient] = None
+    ) -> List[Dict[str, Any]]:
+        """Fetch all repositories accessible by this GitHub App installation."""
+        if not installation_id:
+            return []
+
+        if self.is_configured():
+            try:
+                res = await self.request_with_installation(
+                    installation_id,
+                    "GET",
+                    f"{self.GITHUB_API_BASE}/installation/repositories?per_page=100",
+                    client=client,
+                )
+                if res.status_code == 200:
+                    raw_list = res.json().get("repositories", [])
+                    inst = db.get_installation(installation_id)
+                    full_names = [r.get("full_name") for r in raw_list if r.get("full_name")]
+                    if full_names:
+                        db.upsert_installation(
+                            installation_id=installation_id,
+                            account_login=inst.get("account_login") if inst else None,
+                            repositories=full_names,
+                        )
+                    return [
+                        {
+                            "id": str(r.get("id")),
+                            "name": r.get("name"),
+                            "full_name": r.get("full_name"),
+                            "owner": (r.get("owner") or {}).get("login", ""),
+                            "description": r.get("description") or "Authorized via REGRAVA GitHub App",
+                            "is_private": bool(r.get("private", False)),
+                            "default_branch": r.get("default_branch", "main"),
+                            "open_pull_requests_count": r.get("open_issues_count", 0),
+                            "updated_at": r.get("updated_at", ""),
+                        }
+                        for r in raw_list
+                    ]
+            except Exception as exc:
+                logger.warning("Failed to fetch installation repositories for %s: %s", installation_id, exc)
+
+        inst = db.get_installation(installation_id)
+        if inst and inst.get("repositories"):
+            return [
+                {
+                    "id": f"inst-{repo.replace('/', '-')}",
+                    "name": repo.split("/", 1)[-1],
+                    "full_name": repo,
+                    "owner": repo.split("/", 1)[0],
+                    "description": "Authorized via REGRAVA GitHub App",
+                    "is_private": False,
+                    "default_branch": "main",
+                    "open_pull_requests_count": 0,
+                    "updated_at": "",
+                }
+                for repo in inst["repositories"]
+            ]
+        return []
+
     async def request_with_installation(
         self,
         installation_id: str,

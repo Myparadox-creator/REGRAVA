@@ -238,7 +238,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [selectedProviderInput, setSelectedProviderInput] = useState('gemini');
-  const [selectedModelInput, setSelectedModelInput] = useState('gemini-2.5-flash');
+  const [selectedModelInput, setSelectedModelInput] = useState('gemini-1.5-flash');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
 
@@ -1214,7 +1214,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                   onChange={(e) => {
                     const nextProv = e.target.value;
                     setSelectedProviderInput(nextProv);
-                    if (nextProv === 'gemini') setSelectedModelInput('gemini-2.5-flash');
+                    if (nextProv === 'gemini') setSelectedModelInput('gemini-1.5-flash');
                     else if (nextProv === 'openai') setSelectedModelInput('gpt-4o');
                     else if (nextProv === 'anthropic') setSelectedModelInput('claude-3-5-sonnet-20241022');
                   }}
@@ -1235,9 +1235,9 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                 >
                   {selectedProviderInput === 'gemini' && (
                     <>
-                      <option value="gemini-2.5-flash">gemini-2.5-flash (Recommended — High Speed)</option>
-                      <option value="gemini-1.5-flash">gemini-1.5-flash (Stable LTS)</option>
+                      <option value="gemini-1.5-flash">gemini-1.5-flash (Recommended — Fast & Reliable)</option>
                       <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning & 2M Context)</option>
+                      <option value="gemini-2.0-flash">gemini-2.0-flash (Next-Gen Preview)</option>
                     </>
                   )}
                   {selectedProviderInput === 'openai' && (

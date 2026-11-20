@@ -66,7 +66,7 @@ class GeminiLLMProvider(BaseLLMProvider):
     Requires GEMINI_API_KEY.
     """
 
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    DEFAULT_MODEL = "gemini-1.5-flash"
 
     def get_api_key(self) -> Optional[str]:
         return settings.get_gemini_api_key()
@@ -74,8 +74,8 @@ class GeminiLLMProvider(BaseLLMProvider):
     def get_model(self) -> str:
         configured = settings.get_llm_model()
         if "gemini" in configured.lower():
-            # If still set to deprecated gemini-2.0-flash, migrate to gemini-2.5-flash
-            if configured.lower() in ("gemini-2.0-flash", "models/gemini-2.0-flash"):
+            # If still set to deprecated or unreleased models, migrate to gemini-1.5-flash
+            if configured.lower() in ("gemini-2.0-flash", "models/gemini-2.0-flash", "gemini-2.5-flash", "models/gemini-2.5-flash"):
                 return self.DEFAULT_MODEL
             return configured
         return self.DEFAULT_MODEL
@@ -126,7 +126,7 @@ class GeminiLLMProvider(BaseLLMProvider):
         active_model = model or self.get_model()
         # Candidate models with automatic fallback if Google deprecates a specific model name
         candidate_models = [active_model]
-        for fb in ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]:
+        for fb in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.5-flash"]:
             if fb not in candidate_models:
                 candidate_models.append(fb)
 
