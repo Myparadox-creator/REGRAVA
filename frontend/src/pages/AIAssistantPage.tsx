@@ -1237,7 +1237,6 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                     <>
                       <option value="gemini-1.5-flash">gemini-1.5-flash (Recommended — Fast & Reliable)</option>
                       <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning & 2M Context)</option>
-                      <option value="gemini-2.0-flash">gemini-2.0-flash (Next-Gen Preview)</option>
                     </>
                   )}
                   {selectedProviderInput === 'openai' && (

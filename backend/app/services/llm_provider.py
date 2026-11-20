@@ -72,11 +72,13 @@ class GeminiLLMProvider(BaseLLMProvider):
         return settings.get_gemini_api_key()
 
     def get_model(self) -> str:
-        configured = settings.get_llm_model()
+        configured = (settings.get_llm_model() or "").strip()
+        if configured.startswith("models/"):
+            configured = configured[7:]
+        # If configured with unreleased or deprecated models (2.5, 2.0), migrate to stable 1.5-flash
+        if any(bad in configured.lower() for bad in ("2.5", "2.0", "deprecated", "mock")):
+            return self.DEFAULT_MODEL
         if "gemini" in configured.lower():
-            # If still set to deprecated or unreleased models, migrate to gemini-1.5-flash
-            if configured.lower() in ("gemini-2.0-flash", "models/gemini-2.0-flash", "gemini-2.5-flash", "models/gemini-2.5-flash"):
-                return self.DEFAULT_MODEL
             return configured
         return self.DEFAULT_MODEL
 
@@ -123,12 +125,16 @@ class GeminiLLMProvider(BaseLLMProvider):
                 "Gemini API key is not configured. Please add GEMINI_API_KEY in your environment or Settings."
             )
 
-        active_model = model or self.get_model()
-        # Candidate models with automatic fallback if Google deprecates a specific model name
-        candidate_models = [active_model]
-        for fb in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash", "gemini-2.5-flash"]:
-            if fb not in candidate_models:
-                candidate_models.append(fb)
+        active_model = (model or self.get_model()).strip()
+        if active_model.startswith("models/"):
+            active_model = active_model[7:]
+        if any(bad in active_model.lower() for bad in ("2.5", "2.0")):
+            active_model = self.DEFAULT_MODEL
+
+        # Verified stable production Google Gemini models
+        candidate_models = ["gemini-1.5-flash", "gemini-1.5-pro"]
+        if active_model not in candidate_models:
+            candidate_models.insert(0, active_model)
 
         payload: Dict[str, Any] = {
             "contents": self._convert_messages(messages),
