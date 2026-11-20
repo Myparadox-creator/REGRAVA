@@ -121,11 +121,11 @@ class Settings(BaseModel):
     GITHUB_TOKEN: Optional[str] = os.getenv("GITHUB_TOKEN") or os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
 
     # AI Provider & Assistant Settings
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini")
-    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-1.5-flash")
-    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER") or os.getenv("REGRAVA_LLM_PROVIDER", "gemini")
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY") or os.getenv("REGRAVA_GEMINI_API_KEY")
+    LLM_MODEL: str = os.getenv("LLM_MODEL") or os.getenv("REGRAVA_LLM_MODEL", "gemini-1.5-flash")
+    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY") or os.getenv("REGRAVA_ANTHROPIC_API_KEY")
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY") or os.getenv("REGRAVA_OPENAI_API_KEY")
 
     def get_llm_provider(self) -> str:
         try:
@@ -150,12 +150,13 @@ class Settings(BaseModel):
     def get_gemini_api_key(self) -> Optional[str]:
         try:
             from app.db.session_db import db
-            val = db.get_config("GEMINI_API_KEY")
+            val = db.get_config("GEMINI_API_KEY") or db.get_config("REGRAVA_GEMINI_API_KEY")
             if val:
                 return val.strip()
         except Exception:
             pass
-        return self.GEMINI_API_KEY.strip() if self.GEMINI_API_KEY else None
+        raw = self.GEMINI_API_KEY or os.getenv("REGRAVA_GEMINI_API_KEY")
+        return raw.strip() if raw else None
 
     def get_openai_api_key(self) -> Optional[str]:
         try:
